@@ -3,6 +3,7 @@ FROM ccache-test-image
 ENV DEBIAN_FRONTEND="noninteractive"
 
 RUN apt-get install --yes \
+  binutils \
   git \
   wget
 
@@ -19,9 +20,17 @@ RUN wget http://releases.llvm.org/6.0.0/llvm-6.0.0.src.tar.xz && \
   rm *.tar.xz
 
 RUN ln -s /usr/src/llvm source && \
-  mkdir build
+  mkdir build_static \
+    build_dynamic
 
-RUN cd build && \
+RUN cd build_static && \
   cmake ../source/
+
+RUN cd build_dynamic && \
+  cmake -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_TARGETS_TO_BUILD=X86 \
+    -DBUILD_SHARED_LIBS=ON \
+    -DLLVM_USE_LINKER=gold \
+    ../source/
 
 RUN ccache --clear --max-files=0 --max-size=0 --zero-stats
