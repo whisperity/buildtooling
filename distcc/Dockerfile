@@ -12,14 +12,17 @@ RUN apt-get install --yes \
 
 # Install the compiler stuff required.
 RUN apt-get install --yes \
-  ccache \
   clang \
   cmake \
+  distcc \
+  distcc-pump \
   g++ \
   make
 
-# Set up CCache as wrapper.
-ENV PATH="/usr/lib/ccache:${PATH}"
-RUN /usr/sbin/update-ccache-symlinks
 WORKDIR /tmp
+COPY usage.md /tmp/USAGE.md
 
+# Copy a script that automatically starts the DistCC daemon when the image is
+# created.
+COPY start-distcc.sh /bin/start-distcc
+ENTRYPOINT /bin/start-distcc
