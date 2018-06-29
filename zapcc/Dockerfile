@@ -23,6 +23,8 @@ RUN apt-get install --yes \
   python
 
 # Grab the source code of ZapCC and compile it.
+# At the writing of this, master was at
+# `35fa2aed76fffa222db340dcb9257f66dc858d42`.
 RUN git clone http://github.com/yrnkrn/zapcc.git \
       --depth 1 \
       --single-branch \
