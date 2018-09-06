@@ -21,6 +21,7 @@ if __name__ != '__main__':
 # Read the available data structure of the project to see what projects,
 # compilers and configurations are allowed.
 COMPILERS = []
+BUILD_TOOLS = []
 PROJECTS = []
 PROJECT_CONFIGURATIONS = {}
 
@@ -31,6 +32,8 @@ for name in os.listdir("Dockerfile-Templates"):
 
   if name.startswith("UseCompiler-"):
     COMPILERS.append(name.replace("UseCompiler-", ""))
+  elif name.startswith("Tooling-"):
+    BUILD_TOOLS.append(name.replace("Tooling-", ""))
   elif name.startswith("Project-"):
     PROJECTS.append(name.replace("Project-", ""))
 
@@ -44,8 +47,16 @@ parser.add_argument('-c', '--compiler',
   dest="compiler",
   type=str,
   choices=COMPILERS,
-  default="gcc",
+  required=True,
   help="The compiler to use for compiling the project.")
+
+parser.add_argument('-b', '-t', '--tool',
+  dest="tool",
+  type=str,
+  choices=BUILD_TOOLS,
+  default=None,
+  help="The additional build tool to use aimed to enhance compilation "
+       "experience.")
 
 parser.add_argument('project',
   type=str,
@@ -152,6 +163,12 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
   try:
     with open(template_path, 'r') as infile:
       contents = infile.read()
+
+      # Dockerfiles can contain comments beginning with '#' which is also the
+      # directive character for CPP. They need to be escaped first into
+      # "C++-like" comments.
+      contents = re.sub(r'#', r'//#', contents)
+
       # The C PreProcessor eliminates comments beginning with // which are
       # often found as links in the code.
       contents = contents.replace(r'//', r'\/\/')
@@ -168,6 +185,7 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
     # Now, turn the output back using the previous transformations.
     output = output.replace(r'\/\/', r'//')
     output = re.sub(r'\\\^\$\n', r'\\\n', output)
+    output = re.sub(r'//#', r'#', output)
 
     with open(output_path, 'w') as handle:
       print('\n'.join([line for line in output.split('\n')
@@ -193,8 +211,9 @@ def docker_build(folder, dockerfile, image_name):
                                 '--tag', image_name],
                                cwd=folder):
       print(output_line, end='')
-  except subprocess.CalledProcessError:
+  except subprocess.CalledProcessError as ex:
     print("Calling 'docker build' failed!", file=sys.stderr)
+    print(ex.output, file=sys.stderr)
     sys.exit(1)
 
 # ----------------------------------------------------------------------------
@@ -255,14 +274,18 @@ def __main():
                           output_file,
                           collected_defines)
 
-
   # Create the image for the compiler first.
   execute_preprocess('basics', 'base-image')
 
   # Create the image that contains the user's selected compiler.
   execute_preprocess('UseCompiler-' + args.compiler,
                      'compiler-' + args.compiler)
-  collected_defines['COMPILER'] = args.compiler
+  collected_defines['COMPILER_' + args.compiler] = True
+
+  # Create the image that installs the selected compiler tool.
+  execute_preprocess('Tooling-' + args.tool,
+                     'tool-' + args.tool)
+  collected_defines['TOOL_' + args.tool] = True
 
   # Create the image that downloads the user's selected project.
   execute_preprocess('Project-' + args.project,
