@@ -105,17 +105,22 @@ def call_command(command, input_data=None, env=None, cwd=None):
     proc = subprocess.Popen(command,
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
+                            stderr=subprocess.PIPE,
                             bufsize=-1,
                             cwd=cwd,
                             env=env)
-    out, _ = proc.communicate(input_data)
+    out, err = proc.communicate(input_data)
+
+    return_code = proc.wait()
+    if return_code:
+      raise subprocess.CalledProcessError(return_code, command, out, err)
+
     return out, 0
   except subprocess.CalledProcessError as ex:
-    print("Running command '%s' failed: %d, %s"
-          % (' '.join(command), ex.returncode, ex.output),
+    print("Running command '%s' failed: %d"
+          % (' '.join(command), ex.returncode),
           file=sys.stderr)
-    return ex.output, ex.returncode
+    return ex.stderr, ex.returncode
   except OSError as oerr:
     print("Standard error happened when running command '%s': %s."
           % (' '.join(command), str(oerr)),
@@ -128,16 +133,16 @@ def execute(command, cwd=None):
   Call an external comamnd and dump its output to the current output while it
   is running.
   """
-  popen = subprocess.Popen(command,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT,
-                           cwd=cwd,
-                           universal_newlines=True)
-  for stdout_line in iter(popen.stdout.readline, ""):
+  proc = subprocess.Popen(command,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT,
+                          cwd=cwd,
+                          universal_newlines=True)
+  for stdout_line in iter(proc.stdout.readline, ""):
       yield stdout_line
-  popen.stdout.close()
+  proc.stdout.close()
 
-  return_code = popen.wait()
+  return_code = proc.wait()
   if return_code:
       raise subprocess.CalledProcessError(return_code, command)
 
@@ -166,8 +171,10 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
 
       # Dockerfiles can contain comments beginning with '#' which is also the
       # directive character for CPP. They need to be escaped first into
-      # "C++-like" comments.
-      contents = re.sub(r'#', r'//#', contents)
+      # "C++-like" comments. However, at this point, we rule that "Dockerfile
+      # comments" have to have a space after the #, but preprocessor directives
+      # must not.
+      contents = re.sub(r'# ', r'//# ', contents)
 
       # The C PreProcessor eliminates comments beginning with // which are
       # often found as links in the code.
@@ -178,14 +185,19 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
       # We insert a "^$" before the line break.
       contents = re.sub(r'\\\n', r'\^$\n', contents)
 
-    output, _ = call_command(['cpp'] + define_args,
+    output, ret = call_command(['cpp'] + define_args,
                                codecs.encode(contents, 'utf-8'))
     output = codecs.decode(output, 'utf-8', 'replace')
+    if ret != 0:
+      print("The preprocessing failed, because the preprocessor gave the "
+            "error:", file=sys.stderr)
+      print(output, file=sys.stderr)
+      raise Exception("Preprocessor exited with error code %d" % ret)
 
     # Now, turn the output back using the previous transformations.
     output = output.replace(r'\/\/', r'//')
     output = re.sub(r'\\\^\$\n', r'\\\n', output)
-    output = re.sub(r'//#', r'#', output)
+    output = re.sub(r'//# ', r'# ', output)
 
     with open(output_path, 'w') as handle:
       print('\n'.join([line for line in output.split('\n')
@@ -194,8 +206,6 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
   except:
     print("Couldn't preprocess the Dockerfile template: %s" % template_path,
           file=sys.stderr)
-    import traceback
-    traceback.print_exc()
     sys.exit(1)
 
 
@@ -282,10 +292,11 @@ def __main():
                      'compiler-' + args.compiler)
   collected_defines['COMPILER_' + args.compiler] = True
 
-  # Create the image that installs the selected compiler tool.
-  execute_preprocess('Tooling-' + args.tool,
-                     'tool-' + args.tool)
-  collected_defines['TOOL_' + args.tool] = True
+  if args.tool:
+    # Create the image that installs the selected compiler tool.
+    execute_preprocess('Tooling-' + args.tool,
+                       'tool-' + args.tool)
+    collected_defines['TOOL_' + args.tool] = True
 
   # Create the image that downloads the user's selected project.
   execute_preprocess('Project-' + args.project,
