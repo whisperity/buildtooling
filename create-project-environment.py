@@ -26,8 +26,13 @@ PROJECTS = []
 PROJECT_CONFIGURATIONS = {}
 
 for name in os.listdir("Dockerfile-Templates"):
-  if name == "basics":
-    # The default package can and should always be used.
+  if name == 'basics':
+    continue
+
+  if not os.path.isfile(os.path.join("Dockerfile-Templates",
+                                     name, 'Dockerfile')):
+    print("Invalid package in data structure, '%s' contains no Dockerfile."
+          % name, file=sys.stderr)
     continue
 
   if name.startswith("UseCompiler-"):
@@ -35,7 +40,25 @@ for name in os.listdir("Dockerfile-Templates"):
   elif name.startswith("Tooling-"):
     BUILD_TOOLS.append(name.replace("Tooling-", ""))
   elif name.startswith("Project-"):
-    PROJECTS.append(name.replace("Project-", ""))
+    project = name.replace("Project-", '')
+    PROJECTS.append(project)
+    PROJECT_CONFIGURATIONS[project] = []
+
+    for configuration in os.listdir(os.path.join("Dockerfile-Templates",
+                                                 name)):
+      if configuration == 'Dockerfile':
+        continue
+
+      if not os.path.isfile(os.path.join("Dockerfile-Templates",
+                                         name, configuration,
+                                         'Dockerfile')):
+        print("Invalid package in data structure, configuration '%s' for "
+              "project '%s' contains no Dockerfile."
+              % (configuration, name), file=sys.stderr)
+        continue
+
+      PROJECT_CONFIGURATIONS[project].append(configuration)
+
 
 # ----------------------------------------------------------------------------
 #     Arguments
@@ -76,7 +99,7 @@ conf_group.add_argument('-xs', '--list-configurations',
   dest="list_configurations",
   action='store_true',
   help="Instead of creating the environment, list the available "
-       "configurations for the given compiler + project combination.")
+       "configurations for the given project.")
 
 
 # ----------------------------------------------------------------------------
@@ -237,6 +260,26 @@ def __main():
   """
 
   args = parser.parse_args()
+
+  if args.list_configurations:
+    print("Please note that the availability of the configuration itself "
+          "does not mean that the configuration will successfully execute.\n"
+          "Package creators can insert failure points to their configuration "
+          "scripts to handle mismatches or incompatibilities!")
+    print()
+    print("Available configurations for '%s':" % args.project)
+    for conf in PROJECT_CONFIGURATIONS[args.project]:
+      print("    * %s" % conf)
+    sys.exit(0)
+
+  if args.configuration not in PROJECT_CONFIGURATIONS[args.project]:
+    print("Error: configuration '%s' is not available for project '%s'!"
+          % (args.configuration, args.project),
+          file=sys.stderr)
+    print("Please use -xs/--list-configurations to see what is available.",
+          file=sys.stderr)
+    sys.exit(2)
+
   os.chdir("Dockerfile-Templates")
 
   # Preprocess all the Dockerfiles in the chain and create the outputs that
@@ -301,6 +344,11 @@ def __main():
   # Create the image that downloads the user's selected project.
   execute_preprocess('Project-' + args.project,
                      'project-' + args.project)
+
+  # Now, create the project's configuration based on the user's request.
+  execute_preprocess(os.path.join('Project-' + args.project,
+                                  args.configuration),
+                     args.project + '-' + args.configuration)
 
   for dockerfile in execution_list:
     image_name = execlist_to_image_name[dockerfile]

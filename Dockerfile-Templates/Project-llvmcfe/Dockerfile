@@ -2,7 +2,8 @@ FROM PREVIOUS_IMAGE
 
 RUN apt-get install --yes \
   binutils \
-  git \
+  cmake \
+  python \
   wget
 
 RUN wget "http://releases.llvm.org/6.0.0/llvm-6.0.0.src.tar.xz" && \
@@ -17,3 +18,4 @@ RUN wget "http://releases.llvm.org/6.0.0/llvm-6.0.0.src.tar.xz" && \
   mv llvm /usr/src/llvm && \
   rm *.tar.xz
 
+RUN ln -s /usr/src/llvm /tmp/source
