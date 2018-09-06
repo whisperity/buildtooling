@@ -57,8 +57,28 @@ def console_width():
   return int(length)
 
 
+def set_progress(total, current = 0):
+  """
+  Set the progress bar progress value to be the total, and optionally the given
+  current. This function does not draw the bar again!
+  """
+  global CURRENT_PROGRESS, TOTAL_PROGRESS
+  CURRENT_PROGRESS = max(0, min(current, total))
+  TOTAL_PROGRESS = total
+
+
+def step_progress(inc = 1):
+  """
+  Increases the progress bar's progress value (does not draw a bar) by the
+  given amount.
+  """
+  global CURRENT_PROGRESS
+  CURRENT_PROGRESS = max(0, min(CURRENT_PROGRESS + inc, TOTAL_PROGRESS))
+
+
 def has_progress():
   """
+  Returns whether the current state has an ongoing progress set.
   """
   return CURRENT_PROGRESS > -1 and TOTAL_PROGRESS > -1 and \
          CURRENT_PROGRESS <= TOTAL_PROGRESS
@@ -67,6 +87,7 @@ def has_progress():
 def reset_progress():
   """
   """
+  global CURRENT_PROGRESS, TOTAL_PROGRESS
   CURRENT_PROGRESS = -1
   TOTAL_PROGRESS = -1
 
@@ -78,8 +99,10 @@ def clear_progress_bar():
   print('\r'.ljust(console_width()), end = '\r')
 
 
-def print_progress_bar(iteration, total, prefix = '', suffix = '',
-                       decimals = 1, length = -1, fill = '█'):
+def print_progress_bar(#iteration, total,
+                       prefix = '', suffix = '',
+                       decimals = 1, length = -1,
+                       fill = '█'):
     # (via https://stackoverflow.com/a/34325723/1428773)
     """
     Call in a loop to create terminal progress bar
@@ -93,6 +116,10 @@ def print_progress_bar(iteration, total, prefix = '', suffix = '',
         length      - Optional  : character length of bar (Int)
         fill        - Optional  : bar fill character (Str)
     """
+
+    # Use values from the module state instead of argument.
+    iteration = CURRENT_PROGRESS
+    total = TOTAL_PROGRESS
 
     percent = ("{0:." + str(decimals) + "f}"). \
               format(100 * (iteration / float(total)))
@@ -130,7 +157,7 @@ def __atexit_keep_last_progress_bar():
   """
   if has_progress():
     clear_progress_bar()
-    print_progress_bar(CURRENT_PROGRESS, TOTAL_PROGRESS)
+    print_progress_bar()
     print()
 
 
@@ -151,7 +178,7 @@ def print_message_with_progress(msg = ''):
       # progress bar.
       print(msg)
 
-    print_progress_bar(CURRENT_PROGRESS, TOTAL_PROGRESS)
+    print_progress_bar()
 
 
 def call_command(command, env=None, cwd=None):
@@ -296,28 +323,37 @@ def __main():
   tu_include_count = {}
   tu_compilation_count = {}
 
-  global TOTAL_PROGRESS, CURRENT_PROGRESS
-  TOTAL_PROGRESS = len(compilations)
-  CURRENT_PROGRESS = 0
+  set_progress(len(compilations), 0)
+
+  num_success, num_failure, num_skipped = 0, 0, 0
 
   for command in compilations:
     f = command['file']
 
-    CURRENT_PROGRESS = CURRENT_PROGRESS + 1
+    step_progress()
     print_message_with_progress()
 
     if f.endswith(('.o', '.so', '.a', '.lib', '.exe', '.dll', '.sys',
                    '.out')):
       print_message_with_progress("Skipping non-compilation input: '%s'"
                                   % f)
+      num_skipped = num_skipped + 1
       continue
 
-    headers_needed = create_dependencies(shlex.split(command['command']),
-                                         command['directory'])
+    try:
+      headers_needed = create_dependencies(shlex.split(command['command']),
+                                           command['directory'])
+    except:
+      print_message_with_progress("Couldn't generate dependency list for '%s'"
+                                  % f)
+      num_failure = num_failure + 1
+      continue
 
     # Subtract the main file from the inclusion list to not skew the statistics.
-    headers_included = set(headers_needed).difference([f])
+    headers_included = set([os.path.abspath(h) for h in headers_needed
+                            if h != f])
 
+    # Calculate inclusion and compilation counts.
     for h in headers_included:
       header_inclusion_count[h] = \
         header_inclusion_count[h] + 1 if h in header_inclusion_count \
@@ -332,25 +368,43 @@ def __main():
       if f in tu_compilation_count \
       else 1
 
+    num_success = num_success + 1
+
   reset_progress()
   clear_progress_bar()
 
+  print("    %d total,    %d successfully handled,    %d failed,    %d skipped"
+        % (len(compilations), num_success, num_failure, num_skipped))
+
   print("Calculated source file importancy metrics, writing result JSONs...")
   try:
+    set_progress(3, 0)
+    print_message_with_progress()
+
     with open('times-header-included-to-tu.json', 'w') as handle:
       json.dump(header_inclusion_count, handle,
                 sort_keys = True, indent = 2)
+    step_progress()
+    print_message_with_progress()
+
     with open('headers-tu-includes.json', 'w') as handle:
       json.dump(tu_include_count, handle,
                 sort_keys = True, indent = 2)
+    step_progress()
+    print_message_with_progress()
+
     with open('times-source-file-compiled.json', 'w') as handle:
       json.dump(tu_compilation_count, handle,
                 sort_keys = True, indent = 2)
+    step_progress()
+    print_message_with_progress()
   except OSError as e:
     print("Error! Cannot open file '%s': %s." % (args.build_json, str(e)),
           file=sys.stderr)
     sys.exit(1)
 
+  reset_progress()
+  clear_progress_bar()
 
 
 if __name__ == '__main__':
