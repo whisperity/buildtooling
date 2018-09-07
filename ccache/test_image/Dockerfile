@@ -1,4 +1,4 @@
-FROM ccache-test-image
+FROM tool-ccache
 
 COPY source /usr/src/source
 RUN ln -s /usr/src/source source && \
