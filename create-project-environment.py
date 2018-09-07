@@ -365,6 +365,5 @@ if __name__ == '__main__':
   try:
     __main()
   except KeyboardInterrupt:
-    # Run the termination function of progress-bar clearing at a signal too.
-    __atexit_keep_last_progress_bar()
+    sys.exit(130)
 

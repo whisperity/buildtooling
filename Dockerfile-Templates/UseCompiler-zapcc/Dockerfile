@@ -39,18 +39,20 @@ RUN nproc > /tmp/nproc
 
 WORKDIR /tmp/build
 RUN NPROC=$(cat /tmp/nproc); \
-  touch /tmp/install/foo && \
-  mkdir /tmp/install/bin && \
-  touch /tmp/install/bin/dummy && \
-  chmod +x /tmp/install/bin/dummy
-# TODO: Test if actually works if I have the hardware...
-#  make -k -j${NPROC} && \
-#  make install
+  make -k -j${NPROC}; \
+  make -k -j${NPROC}; \
+  make -k -j${NPROC}; \
+  make install
 
 # Use a new image and only copy the built ZapCC for usage - no need for rest.
 FROM PREVIOUS_IMAGE
 
 COPY --from=zapcc_build /tmp/install/ /
+
+# To allow ZapCC to act as a compiler, install the standard libraries by hand.
+RUN apt-get install --yes \
+  libc6-dev \
+  libstdc++-7-dev
 
 ENV CC="zapcc"
 ENV CXX="zapcc++"
