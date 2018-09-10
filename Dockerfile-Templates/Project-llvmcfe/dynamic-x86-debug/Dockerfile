@@ -8,6 +8,10 @@ RUN mkdir build && \
     -DCMAKE_BUILD_TYPE=Debug \
     -DBUILD_SHARED_LIBS=ON \
     -DLLVM_USE_LINKER=gold \
+#ifdef TOOL_distcc
+    -DCMAKE_C_COMPILER_LAUNCHER="distcc" \
+    -DCMAKE_CXX_COMPILER_LAUNCHER="distcc" \
+#endif
     ../source/
 
 #ifdef TOOL_ccache

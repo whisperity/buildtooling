@@ -7,6 +7,7 @@ import codecs
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,12 @@ for name in os.listdir("Dockerfile-Templates"):
         continue
 
       PROJECT_CONFIGURATIONS[project].append(configuration)
+
+    if not PROJECT_CONFIGURATIONS[project]:
+        # Always allow a "none" configuration to exist if the user did not
+        # specify anything else. In this case, only the project's root script
+        # will be preprocessed.
+        PROJECT_CONFIGURATIONS[project] = ['none']
 
 
 # ----------------------------------------------------------------------------
@@ -175,6 +182,7 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
   Preprocess the given Dockerfile at 'template_path' by executing the
   preprocessor as if the 'defines' dict's elements were defined.
   """
+
   defines = defines if defines else {}
   if type(defines) != dict:
     raise AttributeError("The 'defines' must be a dictionary.")
@@ -191,6 +199,31 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
   try:
     with open(template_path, 'r') as infile:
       contents = infile.read()
+
+      # If the Dockerfile contains the pseudo-macro `#depends`, it means the
+      # file specified in this directive shall be copied to the preprocess
+      # folder for 'docker build' to take.
+      for dependent in \
+          re.finditer(r'^#depends "(.+)"', contents, re.MULTILINE):
+        try:
+          fname = dependent.group(1)
+          source_path = os.path.join(os.path.dirname(template_path), fname)
+          destination_folder = os.path.join(os.path.dirname(output_path),
+                                            os.path.dirname(fname))
+
+          #os.makedirs(destination_folder, exist_ok=True)
+          shutil.copy(source_path, os.path.join(destination_folder, fname))
+
+          print("  > Copied dependent file '%s'." % fname)
+        except Exception as e:
+          print("Failed to copy dependent file '%s'" % fname, file=sys.stderr)
+          print(str(e), file=sys.stderr)
+          raise
+
+      # Cut these pseudo-preprocessor directives to not confuse the real
+      # preprocessor.
+      contents = re.sub(r'^#depends "(.+)"$', r'', contents,
+                        flags=re.MULTILINE)
 
       # Dockerfiles can contain comments beginning with '#' which is also the
       # directive character for CPP. They need to be escaped first into
@@ -223,12 +256,15 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
     output = re.sub(r'//# ', r'# ', output)
 
     with open(output_path, 'w') as handle:
+      # Strip wholly empty lines because sometimes the preprocessor cut some
+      # conditional continuation from the original source.
       print('\n'.join([line for line in output.split('\n')
-                       if not line.startswith('#')]),
+                       if line and not line.startswith('#')]),
             file=handle)
-  except:
+  except Exception as e:
     print("Couldn't preprocess the Dockerfile template: %s" % template_path,
           file=sys.stderr)
+    print(str(e), file=sys.stderr)
     sys.exit(1)
 
 
@@ -272,7 +308,8 @@ def __main():
       print("    * %s" % conf)
     sys.exit(0)
 
-  if args.configuration not in PROJECT_CONFIGURATIONS[args.project]:
+  if PROJECT_CONFIGURATIONS[args.project] != ['none'] and \
+          args.configuration not in PROJECT_CONFIGURATIONS[args.project]:
     print("Error: configuration '%s' is not available for project '%s'!"
           % (args.configuration, args.project),
           file=sys.stderr)
@@ -346,9 +383,10 @@ def __main():
                      'project-' + args.project)
 
   # Now, create the project's configuration based on the user's request.
-  execute_preprocess(os.path.join('Project-' + args.project,
-                                  args.configuration),
-                     args.project + '-' + args.configuration)
+  if PROJECT_CONFIGURATIONS[args.project] != ['none']:
+    execute_preprocess(os.path.join('Project-' + args.project,
+                                    args.configuration),
+                       args.project + '-' + args.configuration)
 
   for dockerfile in execution_list:
     image_name = execlist_to_image_name[dockerfile]

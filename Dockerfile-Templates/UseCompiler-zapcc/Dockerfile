@@ -37,6 +37,8 @@ RUN mkdir /tmp/build /tmp/install && \
 
 RUN nproc > /tmp/nproc
 
+# Two or three 'make' calls should be executed because for some reason the
+# 'Attribute.gen' generation fails on the initial 'make' call.
 WORKDIR /tmp/build
 RUN NPROC=$(cat /tmp/nproc); \
   make -k -j${NPROC}; \

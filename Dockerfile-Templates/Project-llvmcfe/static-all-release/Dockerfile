@@ -6,6 +6,10 @@ RUN mkdir build && \
   cd build && \
   cmake \
     -DCMAKE_BUILD_TYPE=Release \
+#ifdef TOOL_distcc
+    -DCMAKE_C_COMPILER_LAUNCHER="distcc" \
+    -DCMAKE_CXX_COMPILER_LAUNCHER="distcc" \
+#endif
     ../source/
 
 #ifdef TOOL_ccache
