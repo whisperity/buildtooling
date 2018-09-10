@@ -8,4 +8,3 @@ RUN apt-get install --yes \
 COPY distcc-welcome.sh /tmp/distcc-welcome.sh
 RUN cat /tmp/distcc-welcome.sh >> /etc/bash.bashrc && \
   rm /tmp/distcc-welcome.sh
-

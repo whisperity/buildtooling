@@ -10,4 +10,3 @@ RUN apt-get install --yes \
   time \
   vim \
   wget
-

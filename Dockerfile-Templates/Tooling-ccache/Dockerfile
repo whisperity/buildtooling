@@ -6,4 +6,3 @@ RUN apt-get install --yes \
 # Set up CCache as a wrapper.
 ENV PATH="/usr/lib/ccache:${PATH}"
 RUN /usr/sbin/update-ccache-symlinks
-

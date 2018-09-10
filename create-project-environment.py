@@ -30,8 +30,10 @@ for name in os.listdir("Dockerfile-Templates"):
   if name == 'basics':
     continue
 
-  if not os.path.isfile(os.path.join("Dockerfile-Templates",
-                                     name, 'Dockerfile')):
+  folder = os.path.join("Dockerfile-Templates", name)
+
+  if os.path.isdir(folder) and \
+        not os.path.isfile(os.path.join(folder, 'Dockerfile')):
     print("Invalid package in data structure, '%s' contains no Dockerfile."
           % name, file=sys.stderr)
     continue
@@ -50,15 +52,16 @@ for name in os.listdir("Dockerfile-Templates"):
       if configuration == 'Dockerfile':
         continue
 
-      if not os.path.isfile(os.path.join("Dockerfile-Templates",
-                                         name, configuration,
-                                         'Dockerfile')):
-        print("Invalid package in data structure, configuration '%s' for "
-              "project '%s' contains no Dockerfile."
-              % (configuration, name), file=sys.stderr)
-        continue
+      conf_folder = os.path.join(folder, configuration)
 
-      PROJECT_CONFIGURATIONS[project].append(configuration)
+      if os.path.isdir(conf_folder):
+        if not os.path.isfile(os.path.join(conf_folder, 'Dockerfile')):
+          print("Invalid package in data structure, configuration '%s' for "
+                "project '%s' contains no Dockerfile."
+                % (configuration, name), file=sys.stderr)
+          continue
+
+        PROJECT_CONFIGURATIONS[project].append(configuration)
 
     if not PROJECT_CONFIGURATIONS[project]:
         # Always allow a "none" configuration to exist if the user did not
@@ -370,12 +373,14 @@ def __main():
   # Create the image that contains the user's selected compiler.
   execute_preprocess('UseCompiler-' + args.compiler,
                      'compiler-' + args.compiler)
+  collected_defines['COMPILER'] = args.compiler
   collected_defines['COMPILER_' + args.compiler] = True
 
   if args.tool:
     # Create the image that installs the selected compiler tool.
     execute_preprocess('Tooling-' + args.tool,
                        'tool-' + args.tool)
+    collected_defines['TOOL'] = args.tool
     collected_defines['TOOL_' + args.tool] = True
 
   # Create the image that downloads the user's selected project.
