@@ -1,5 +1,16 @@
 #!/bin/bash
 
+if [ $# -eq 2 ]
+then
+  if [ "$1" == "--jobs" -o "$1" == "-j" ]
+  then
+    echo "Starting DistCC with $2 jobs..."
+    NPROC=$2
+
+    shift 2
+  fi
+fi
+
 if [ -z "${NPROC}" ]
 then
   NPROC=$(nproc)

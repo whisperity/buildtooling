@@ -12,7 +12,7 @@ then
   echo "Please make sure that 'DISTCC_HOSTS' is set appropriately before "
   echo "executing the compiler calls."
   echo
-  echo "Please use the command 'distcc-host-add <hostname> <jobs> [port] "
+  echo "Please use the command 'distcc_host_add <hostname> <jobs> [port] "
   echo "to add the DistCC server running at hostname:port with max jobs "
   echo "jobs to the list of servers used."
 fi

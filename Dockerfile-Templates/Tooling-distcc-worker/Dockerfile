@@ -1,13 +1,11 @@
 # TODO: If multiple tools are allowed, don't allow this image to be built with
 # 'distcc' tool also enabled.
 
-# Pull 'tini' (tiny but valid init script) to the current image so that the
-# daemon can be run in the background properly.
-FROM krallin/ubuntu-tini:latest AS tini_image
-
 FROM PREVIOUS_IMAGE
 
-COPY --from=tini_image /usr/bin/tini /sbin/tini
+# Pull 'tini' (tiny but valid init script) to the current image so that the
+# daemon can be run in the background properly.
+COPY --from=krallin/ubuntu-tini:latest /usr/bin/tini /sbin/tini
 
 RUN apt-get install --yes \
   distcc
