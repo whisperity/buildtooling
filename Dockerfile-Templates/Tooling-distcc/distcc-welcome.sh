@@ -17,7 +17,37 @@ then
   echo "jobs to the list of servers used."
 fi
 
-# ----------------------------------------------------------------------------
+echo
+echo "Type 'distcc-hosts' to check which remote servers are configured."
+echo
+
+if [ -f /etc/distcc-min-shm-size ]
+then
+  MIN_SIZE=$(cat /etc/distcc-min-shm-size)
+  CUR_SIZE=$(df /dev/shm | tail -n +2 | awk '{print $2}')
+  if [ $CUR_SIZE -lt $MIN_SIZE ]
+  then
+    echo "The project used specifies a distcc minimum shared memory size "
+    echo "of '${MIN_SIZE}' bytes for 'distcc-pump' mode to work."
+    echo "Current configured shared memory is '${CUR_SIZE}' bytes."
+    echo
+    echo "Pump mode will be disabled! Please create a new container with the "
+    echo "extra option '--shm-size ${CUR_SIZE}' specified."
+
+    PUMP_BINARY=$(which distcc-pump)
+    # Just purge the 'pump' binary completely...
+    apt-get purge -qqy distcc-pump 2>&1 >/dev/null
+
+    cat << EOF > ${PUMP_BINARY}
+#!/bin/bash
+echo "DistCC Pump mode is disabled because shared memory is too small for this project."
+echo "Please start a new container with '--shm-size ${CUR_SIZE}' specified."
+exit 1
+EOF
+    chmod +x ${PUMP_BINARY}
+  fi
+fi
+
 
 __load_additional_distcc_host() {
   # Load a distcc host value from the temporary file if it exists.

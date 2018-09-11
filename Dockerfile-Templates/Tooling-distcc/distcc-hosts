@@ -1,0 +1,10 @@
+#!/bin/bash
+# vim: syntax=sh
+
+for host in ${DISTCC_HOSTS}
+do
+  HOSTNAME=$(echo "${host}" | cut -d ":" -f1)
+  PORT=$(echo "${host}" | cut -d ":" -f2 | cut -d "/" -f1)
+  JOBS=$(echo "${host}" | cut -d ":" -f2 | cut -d "/" -f2 | cut -d "," -f1)
+  echo "${HOSTNAME}:${PORT} (${JOBS} jobs)"
+done
