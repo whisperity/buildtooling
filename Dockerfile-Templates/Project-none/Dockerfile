@@ -1,13 +1,10 @@
 FROM PREVIOUS_IMAGE
 
-RUN apt-get install --yes \
-  make
-
 #depends "hello.c"
-#depends "Makefile"
+#depends "make"
 COPY hello.c /usr/src/hello.c
-COPY Makefile /usr/src/Makefile
+COPY make /usr/src/make
 
 WORKDIR /tmp
-RUN ln -s /usr/src/Makefile /tmp/Makefile && \
+RUN ln -s /usr/src/make /tmp/make && \
   ln -s /usr/src/hello.c /tmp/hello.c

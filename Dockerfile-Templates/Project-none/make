@@ -1,0 +1,33 @@
+#!/bin/sh
+# vim: syntax=sh
+
+ACT="$1"
+if [ $# -ne 1 ]
+then
+  ACT="all"
+fi
+
+if [ -z "${CC}" ]
+then
+  CC="cc"
+fi
+
+case ${ACT} in
+  "hello.o")
+    echo "${CC} ${CFLAGS} -c \"hello.c\""
+    ${CC} ${CFLAGS} -c "hello.c"
+    ;;
+  "all" | "hello")
+    echo "${CC} ${CFLAGS} -c \"hello.c\""
+    ${CC} ${CFLAGS} -c "hello.c"
+    echo "${CC} ${CFLAGS} -o hello \"hello.o\""
+    ${CC} ${CFLAGS} -o hello "hello.o"
+    ;;
+  "clean")
+    echo "rm hello.o hello"
+    rm hello.o hello
+    ;;
+  *)
+    echo "Error: bad target." >&2
+    exit 1
+esac
