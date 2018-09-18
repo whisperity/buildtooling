@@ -5,10 +5,12 @@
 import argparse
 import codecs
 import os
+import random
 import re
 import shlex
 import shutil
 import subprocess
+import string
 import sys
 import tempfile
 
@@ -124,12 +126,16 @@ conf_group.add_argument('-xs', '--list-configurations',
 # ----------------------------------------------------------------------------
 
 
-def console_width():
+def replace_randomise(occurrence):
   """
-  """
+  Handles the '#randomise' preprocessor pseudo-directive that defines the
+  argument macro to a random value at preprocessing time.
 
-  _, length = os.popen('stty size', 'r').read().split()
-  return int(length)
+  :note: This randomisation is NOT cryptographically secure!
+  """
+  rand = ''.join(random.choice(string.ascii_lowercase + string.digits)
+                 for _ in range(16))
+  return ''.join(["#define ", occurrence.group(1), " ", rand])
 
 
 def call_command(command, input_data=None, env=None, cwd=None):
@@ -226,6 +232,15 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
           print(str(e), file=sys.stderr)
           raise
 
+      # Handles the preprocessor pseudo-directive that defines a given macro
+      # to some random value. A line of "#randomise X" equals to the real
+      # preprocessor directive "#define X --random--" where the random part
+      # is generated at preprocessing time.
+      # This is replaced with a random value at every preprocessing of the
+      # file, turning off the ability for Docker to cache the build.
+      contents = re.sub(r'^#randomise (.*)$', replace_randomise, contents,
+                        flags=re.MULTILINE)
+
       # Cut these pseudo-preprocessor directives to not confuse the real
       # preprocessor.
       contents = re.sub(r'^#depends "(.+)"$', r'', contents,
@@ -253,6 +268,7 @@ def preprocess_dockerfile(template_path, output_path, defines=None):
     if ret != 0:
       print("The preprocessing failed, because the preprocessor gave the "
             "error:", file=sys.stderr)
+      print("", file=sys.stderr)
       print(output, file=sys.stderr)
       raise Exception("Preprocessor exited with error code %d" % ret)
 
