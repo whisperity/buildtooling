@@ -19,6 +19,10 @@ if __name__ != '__main__':
 # ----------------------------------------------------------------------------
 #     Preparation phase to set up argument choices.
 # ----------------------------------------------------------------------------
+
+DOCKERFILES_FOLDER = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                  'Dockerfiles')
+
 # Read the available data structure of the project to see what projects,
 # compilers and configurations are allowed.
 COMPILERS = []
@@ -26,11 +30,11 @@ BUILD_TOOLS = []
 PROJECTS = []
 PROJECT_CONFIGURATIONS = {}
 
-for name in os.listdir("Dockerfile-Templates"):
+for name in os.listdir(DOCKERFILES_FOLDER):
   if name == 'basics':
     continue
 
-  folder = os.path.join("Dockerfile-Templates", name)
+  folder = os.path.join(DOCKERFILES_FOLDER, name)
 
   if os.path.isdir(folder) and \
         not os.path.isfile(os.path.join(folder, 'Dockerfile')):
@@ -47,8 +51,7 @@ for name in os.listdir("Dockerfile-Templates"):
     PROJECTS.append(project)
     PROJECT_CONFIGURATIONS[project] = []
 
-    for configuration in os.listdir(os.path.join("Dockerfile-Templates",
-                                                 name)):
+    for configuration in os.listdir(os.path.join(DOCKERFILES_FOLDER, name)):
       if configuration == 'Dockerfile':
         continue
 
@@ -320,7 +323,7 @@ def __main():
           file=sys.stderr)
     sys.exit(2)
 
-  os.chdir("Dockerfile-Templates")
+  os.chdir(DOCKERFILES_FOLDER)
 
   # Preprocess all the Dockerfiles in the chain and create the outputs that
   # can be built.
