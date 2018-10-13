@@ -1,8 +1,5 @@
 FROM PREVIOUS_IMAGE
 
-RUN apt-get install --yes \
-  cmake
-
 WORKDIR /tmp
 
 RUN mkdir build && \

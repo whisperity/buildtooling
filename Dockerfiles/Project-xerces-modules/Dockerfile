@@ -1,9 +1,40 @@
+FROM PREVIOUS_IMAGE AS cmake_build
+
+RUN apt-get install --yes \
+  g++ \
+  make
+
+ENV CC="gcc"
+ENV CXX="g++"
+
+RUN nproc > /tmp/nproc
+
+# Build our custom version of CMake for now, because this feature is under
+# review to be integrated into upstream CMake.
+RUN git clone "http://gitlab.kitware.com/Whisperity/CMake.git" \
+    /usr/src/cmake && \
+  cd /usr/src/cmake && \
+  echo "Current CMake master hash is: $(git rev-parse origin/master)" && \
+  echo "Current CMake topic hash is: $(git rev-parse origin/clang-modules)"
+
+RUN cd /usr/src/cmake && \
+  ./bootstrap --parallel=$(cat /tmp/nproc) --prefix="/tmp/install" && \
+  git checkout clang-modules && \
+  make install -j$(cat /tmp/nproc)
+
+FROM PREVIOUS_IMAGE
 #ifndef COMPILER_clang
 #error A Modules-enabled project cannot be used without the LLVM/Clang compiler.
 #endif
 
-FROM PREVIOUS_IMAGE
+# Install our custom version of CMake.
+RUN apt-get purge --yes \
+  cmake && \
+  apt-get autoremove --yes
 
+COPY --from=cmake_build /tmp/install /
+
+# Build Xerces.
 RUN apt-get install --yes \
   binutils \
   wget \
