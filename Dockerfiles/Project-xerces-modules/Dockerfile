@@ -37,6 +37,7 @@ COPY --from=cmake_build /tmp/install /
 # Build Xerces.
 RUN apt-get install --yes \
   binutils \
+  make \
   wget \
   unzip
 
@@ -52,9 +53,9 @@ RUN apt-get install --yes \
 #randomise SOME_RANDOM_VALUE
 ENV RAND=SOME_RANDOM_VALUE
 
-RUN wget "http://github.com/whisperity/xerces-c-modules/archive/modules.zip" -O "modules.zip" && \
-  unzip modules.zip && \
-  mv xerces-c-modules-modules /usr/src/xerces-c && \
-  rm modules.zip
+RUN wget "http://github.com/whisperity/xerces-c-modules/archive/master.zip" -O "xerces-c.zip" && \
+  unzip xerces-c.zip && \
+  mv xerces-c-* /usr/src/xerces-c && \
+  rm xerces-c.zip
 
 RUN ln -s /usr/src/xerces-c /tmp/source
