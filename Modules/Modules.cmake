@@ -30,4 +30,7 @@ function(add_module_to_target _target _moduleName)
     FULL_NAME_${_moduleName}=${_targetedModule})
 
   target_link_libraries(${_target} ${_targetedModule})
+  target_compile_definitions(${_target}
+    PRIVATE
+    MODULE_NAME_${_moduleName}=${_targetedModule})
 endfunction()
