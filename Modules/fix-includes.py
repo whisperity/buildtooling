@@ -8,9 +8,17 @@ from collections import Counter
 from itertools import filterfalse, tee
 
 try:
+  import toposort
+except ImportError as e:
+  print("Error! A dependency of this tool could not be satisfied. Please "
+        "install the following Python package via 'pip' either to the "
+        "system, or preferably create a virtualenv.")
+  print(str(e))
+  sys.exit(1)
+
+try:
   from tqdm import tqdm
 except ImportError:
-
   class tqdm():
     """
     tqdm progress bar wrapper if the 'tqdm' package is not installed.
@@ -47,6 +55,52 @@ except ImportError:
   print("Python library 'tqdm' not found, no progress will be printed.",
         file=sys.stderr)
   #tqdm = lambda *i, **kwargs: i[0]  # pylint:disable=invalid-name
+
+
+def concatenate_files(header, source):
+  """
+  Read the specified header and source file and concatenate them in
+  "header, source" order.
+  """
+  content = ""
+
+  if (header):
+    content = """
+// +*************************************************************************+
+//   Begin header file '%s'
+// +*************************************************************************+
+
+""" % header
+
+    with codecs.open(header, 'r', encoding='utf-8', errors='replace') as hdr:
+      content += hdr.read()
+
+    content += """
+// +*************************************************************************+
+//   End header file '%s'
+// +*************************************************************************+
+""" % header
+
+  if (source):
+    content += """
+// +*************************************************************************+
+//   Begin implementation file '%s'
+// +*************************************************************************+
+
+""" % source
+
+    with codecs.open(source, 'r', encoding='utf-8', errors='replace') as src:
+      content += src.read()
+
+    content += """
+// +*************************************************************************+
+//   End implementation file '%s'
+// +*************************************************************************+
+
+""" % source
+
+  return content
+
 
 if not os.path.isfile("CMakeLists.txt"):
   print("Error: this script should be run from a source folder.",
@@ -91,8 +145,6 @@ def get_module_map(folder):
 
   ret = {}
   module_macro = re.compile(r'FULL_NAME_(?P<name>[\w_\-\d]+)?;[\s]*$')
-
-  print("Fetching \"module map\" for source tree '%s'" % folder)
 
   # Read the files and create the mapping.
   for file in tqdm(walk_folder(folder),
@@ -142,6 +194,7 @@ def get_module_map(folder):
 
   return ret
 
+
 def eliminate_duplicate_values(d):
   """
   Eliminates the duplicate values in a dict's value side.
@@ -168,56 +221,22 @@ if duplicates:
   print('\n'.join(duplicates), file=sys.stderr)
 
 
-def concatenate_files(header, source):
-  """
-  Read the specified header and source file and concatenate them in
-  "header, source" order.
-  """
-  content = ""
-
-  if (header):
-    content = """
-// +*************************************************************************+
-//   Begin header file '%s'
-// +*************************************************************************+
-
-""" % header
-
-    with codecs.open(header, 'r', encoding='utf-8', errors='replace') as hdr:
-      content += hdr.read()
-
-    content += """
-// +*************************************************************************+
-//   End header file '%s'
-// +*************************************************************************+
-""" % header
-
-  if (source):
-    content += """
-// +*************************************************************************+
-//   Begin implementation file '%s'
-// +*************************************************************************+
-
-""" % source
-
-    with codecs.open(source, 'r', encoding='utf-8', errors='replace') as src:
-      content += src.read()
-
-    content += """
-// +*************************************************************************+
-//   End implementation file '%s'
-// +*************************************************************************+
-
-""" % source
-
-  return content
-
-import time
-def handle_source_text(file, text):
+def handle_source_text(modulemap, self_dependency_map, file, text):
   """
   Handles mapping the #include statements to modules in a concatenated source
   text.
   """
+
+  # Get the "first" module from the module map read earlier which contains
+  # the included file as its own include (so the included file's code is
+  # in the said module).
+  # First is good enough as the module map was uniqued out earlier.
+  def __get_module(include):
+    return next(
+      filter(
+        lambda item: include in item[1],
+        modulemap.items()),
+      (None, None))[0]
 
   # Rearrange the include statements so all of them are on the top, and for
   # easier rewriting to "import", in alphabetical order.
@@ -226,6 +245,8 @@ def handle_source_text(file, text):
     lambda line: not line.startswith("#include"),
     text.splitlines(True))
   include_lines = list(sorted(include_lines))
+
+  self_module = __get_module(file)
 
   if not include_lines:
     # If the file contains no "#include" statements, no need to do anything.
@@ -242,23 +263,12 @@ def handle_source_text(file, text):
     if not included:
       continue
 
-    # Get the "first" module from the module map read earlier which contains
-    # the included file as its own include (so the included file's code is
-    # in the said module).
-    # First is good enough as the module map was uniqued out earlier.
-    def __get_module(include):
-      return next(
-        filter(
-          lambda item: include in item[1],
-          MODULEMAP.items()),
-        (None, None))[0]
-
     module = __get_module(included)
     if not module:
       # If no module is found for the include, it might have been an include
       # from the local folder. Let's try that way first...
-      module = __get_module(os.path.join(os.path.dirname(file), included))
-
+      included = os.path.join(os.path.dirname(file), included)
+      module = __get_module(included)
     if not module:
       tqdm.write("%s: Included '%s' not found in module map"
                  % (file, included),
@@ -266,7 +276,21 @@ def handle_source_text(file, text):
       lines_to_keep.append(line.strip())
       continue
 
-    found_used_modules.add(module)
+    if module == self_module and self_module is not None:
+      # Files can transitively and with the employment of header guards,
+      # recursively include each other, which is not a problem in normal C++,
+      # but for imports this must be evaded, as the files are put into a module
+      # wrapper, which should not include itself.
+      # However, for this module "wrapper" file to work, the includes of the
+      # module "fragments" (which are rewritten by this script) must be in
+      # a good order.
+      if self_module not in self_dependency_map:
+        self_dependency_map[self_module] = {}
+      if file not in self_dependency_map[self_module]:
+        self_dependency_map[self_module][file] = set()
+      self_dependency_map[self_module][file].add(included)
+    else:
+      found_used_modules.add(module)
 
   new_includes = "/* Automatically generated include list. */\n" + \
                  '\n'.join(lines_to_keep) + \
@@ -274,10 +298,13 @@ def handle_source_text(file, text):
                  '\n'.join(["import MODULE_NAME_" + mod + ';'
                             for mod in found_used_modules])
 
-  with open(file, 'w') as f:
+  with open(os.devnull, 'w') as f:
     f.write(new_includes)
     f.write("\n\n")
     f.write('\n'.join(other_lines))
+
+
+SELF_DEPENDENCY_MAP = {}
 
 # Check for headers that may or may not have an implementation CPP to them.
 for file in tqdm(walk_folder(os.getcwd()),
@@ -293,7 +320,8 @@ for file in tqdm(walk_folder(os.getcwd()),
     # If the header does not have an implementation pair, do only the header.
     cpp_path = None
 
-  handle_source_text(file, concatenate_files(file, cpp_path))
+  handle_source_text(MODULEMAP, SELF_DEPENDENCY_MAP,
+                     file, concatenate_files(file, cpp_path))
 
 # Check for source files that do not have a header named like them.
 for file in tqdm(walk_folder(os.getcwd()),
@@ -310,4 +338,20 @@ for file in tqdm(walk_folder(os.getcwd()),
     # handled.
     continue
 
-  handle_source_text(file, concatenate_files(None, file))
+  handle_source_text(MODULEMAP, SELF_DEPENDENCY_MAP,
+                     file, concatenate_files(None, file))
+
+import json
+#print(json.dumps(SELF_DEPENDENCY_MAP, indent=2, sort_keys=True))
+
+for module in SELF_DEPENDENCY_MAP.keys():
+  try:
+    topo = toposort.toposort(SELF_DEPENDENCY_MAP[module])
+    topo = list(topo)
+    print("MODULE %s DEPENDENCIES" % module)
+    topo = [list(x) for x in list(topo)]  # Convert sets to lists...
+    print(json.dumps(topo, indent=2, sort_keys=False))
+  except toposort.CircularDependencyError:
+    # print("Circular dependency in module '%s'." % module, file=sys.stderr)
+    # print("Ignoring for now...", file=sys.stderr)
+    pass
