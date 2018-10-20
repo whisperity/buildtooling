@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
+import codecs
 import os
+import re
 import sys
 
 try:
@@ -18,6 +20,8 @@ from utils.progress_bar import tqdm
 from ModulesTSMaker import *
 
 
+HEADER_FILE = re.compile(r'\.(H(XX|PP|\+\+)?|h(xx|pp|\+\+)?|t(xx|pp|\+\+))$')
+
 if not os.path.isfile("CMakeLists.txt"):
   print("Error: this script should be run from a source folder.",
         file=sys.stderr)
@@ -25,62 +29,55 @@ if not os.path.isfile("CMakeLists.txt"):
 
 
 MODULEMAP = mapping.get_module_mapping(os.getcwd())
-MODULEMAP, duplicates = utils.eliminate_dict_listvalue_duplicates(MODULEMAP)
+MODULEMAP, DUPLICATES = utils.eliminate_dict_listvalue_duplicates(MODULEMAP)
+INTRAMODULE_DEPENDENCY_MAP = {}
 
-if duplicates:
+if DUPLICATES:
   print("Error: Some files are included into multiple modules. These files "
         "had been removed from the mapping!", file=sys.stderr)
-  print('\n'.join(duplicates), file=sys.stderr)
+  print('\n'.join(DUPLICATES), file=sys.stderr)
 
 
-SELF_DEPENDENCY_MAP = {}
+def __all_files_in_folder(desc=""):
+  """Wrapper function that returns a progressbar-decorated generator for
+  all files in the current tree."""
+  return tqdm(walk_folder(os.getcwd()),
+              unit='files',
+              desc=desc,
+              total=len(list(walk_folder(os.getcwd()))),
+              position=1)
 
-# Check for headers that may or may not have an implementation CPP to them.
-for file in tqdm(walk_folder(os.getcwd()),
-                 unit='files',
-                 desc="Iface-Impl pairs",
-                 total=len(list(walk_folder(os.getcwd()))),
-                 position=1):
-  if not file.endswith('.hpp'):
+
+# First look for header files and handle the include directives that a
+# module fragment's header includes.
+for file in __all_files_in_folder(desc="Ordering headers"):
+  if not re.search(HEADER_FILE, file):
     continue
 
-  cpp_path = file.replace('.hpp', '.cpp')
-  if not os.path.isfile(cpp_path):
-    # If the header does not have an implementation pair, do only the header.
-    cpp_path = None
-
-  include.handle_source_text(MODULEMAP, SELF_DEPENDENCY_MAP,
-                             file, util.concatenate_files(file, cpp_path))
-
-# Check for source files that do not have a header named like them.
-for file in tqdm(walk_folder(os.getcwd()),
-                 unit='files',
-                 desc="Solo impl. files",
-                 total=len(list(walk_folder(os.getcwd()))),
-                 position=1):
-  if not file.endswith('.cpp'):
+  content = None
+  try:
+    with codecs.open(file, 'r', encoding='utf-8', errors='replace') as f:
+      content = f.read()
+  except OSError as e:
+    tqdm.write("Couldn't read file '%s': %s" % (file, e),
+               file=sys.stderr)
     continue
 
-  hpp_path = file.replace('.cpp', '.hpp')
-  if os.path.isfile(hpp_path):
-    # If the implementation file had a header pair with it, it is already
-    # handled.
-    continue
-
-  include.handle_source_text(MODULEMAP, SELF_DEPENDENCY_MAP,
-                             file, util.concatenate_files(None, file))
+  include.transform_includes_to_imports(file,
+                                        content,
+                                        MODULEMAP,
+                                        INTRAMODULE_DEPENDENCY_MAP)
 
 import json
-#print(json.dumps(SELF_DEPENDENCY_MAP, indent=2, sort_keys=True))
 
-for module in SELF_DEPENDENCY_MAP.keys():
+for module in INTRAMODULE_DEPENDENCY_MAP.keys():
   try:
-    topo = toposort.toposort(SELF_DEPENDENCY_MAP[module])
+    topo = toposort.toposort(INTRAMODULE_DEPENDENCY_MAP[module])
     topo = list(topo)
     print("MODULE %s DEPENDENCIES" % module)
     topo = [list(x) for x in list(topo)]  # Convert sets to lists...
     print(json.dumps(topo, indent=2, sort_keys=False))
   except toposort.CircularDependencyError:
-    # print("Circular dependency in module '%s'." % module, file=sys.stderr)
-    # print("Ignoring for now...", file=sys.stderr)
+    print("Circular dependency in module '%s'." % module, file=sys.stderr)
+    print("Ignoring for now...", file=sys.stderr)
     pass
