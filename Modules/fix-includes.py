@@ -5,17 +5,6 @@ import os
 import re
 import sys
 
-try:
-  import toposort
-except ImportError as e:
-  print("Error! A dependency of this tool could not be satisfied. Please "
-        "install the following Python package via 'pip' either to the "
-        "system, or preferably create a virtualenv.")
-  print(str(e))
-  sys.exit(1)
-
-import utils
-from utils import walk_folder
 from utils.progress_bar import tqdm
 from ModulesTSMaker import *
 
@@ -60,18 +49,14 @@ for file in tqdm(headers,
                                        content,
                                        MODULEMAP,
                                        INTRAMODULE_DEPENDENCY_MAP)
-  time.sleep(0.005)
 
-import json
+print("\n")
 
-for module in INTRAMODULE_DEPENDENCY_MAP.keys():
-  try:
-    topo = toposort.toposort(INTRAMODULE_DEPENDENCY_MAP[module])
-    topo = list(topo)
-    print("MODULE %s DEPENDENCIES" % module)
-    topo = [list(x) for x in list(topo)]  # Convert sets to lists...
-    print(json.dumps(topo, indent=2, sort_keys=False))
-  except toposort.CircularDependencyError:
-    print("Circular dependency in module '%s'." % module, file=sys.stderr)
-    print("Ignoring for now...", file=sys.stderr)
-    pass
+# Fix the headers in the module file so they are in a topological order.
+# This ensures that intra-module dependencies in the order of the module's
+# headers' inclusion are satisfied.
+for module, dependencies in INTRAMODULE_DEPENDENCY_MAP.items():
+  mapping.write_topological_order(MODULEMAP[module]['file'],
+                                  MODULEMAP[module]['fragments'],
+                                  HEADER_FILE,
+                                  dependencies)
