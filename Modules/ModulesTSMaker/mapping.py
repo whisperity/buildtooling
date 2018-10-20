@@ -1,9 +1,14 @@
 import os
 import re
 import sys
+from collections import Counter
+
 from utils import strip_folder, walk_folder
 from utils.progress_bar import tqdm
 from . import include
+
+
+MODULE_MACRO = re.compile(r'FULL_NAME_(?P<name>[\w_\-\d]+)?;[\s]*$')
 
 
 def get_module_mapping(srcdir):
@@ -11,9 +16,7 @@ def get_module_mapping(srcdir):
   Reads up the current working directory and create a mapping of which
   source file (as a module fragment) is mapped into which module.
   """
-
   ret = {}
-  module_macro = re.compile(r'FULL_NAME_(?P<name>[\w_\-\d]+)?;[\s]*$')
 
   # Read the files and create the mapping.
   for file in tqdm(walk_folder(srcdir),
@@ -31,11 +34,12 @@ def get_module_mapping(srcdir):
           continue
 
         line = line.replace('export module ', '')
-        match = re.match(module_macro, line)
+        match = MODULE_MACRO.match(line)
         if not match:
           tqdm.write("Error! Cannot read input file '%s' because "
                      "'export module' line is badly formatted.\n%s"
-                     % (file, line), file=sys.stderr)
+                     % (file, line),
+                     file=sys.stderr)
           break
         module_name = match.group('name')
         break
@@ -44,7 +48,10 @@ def get_module_mapping(srcdir):
         # Skip parsing the file if it was bogus.
         continue
 
-      ret[module_name] = []
+      ret[module_name] = {'file': file,
+                          'fragments': [],
+                          'imported-modules': set()
+                          }
       f.seek(0)
       for line in f.readlines():
         included = include.directive_to_filename(line)
@@ -59,6 +66,28 @@ def get_module_mapping(srcdir):
                      file=sys.stderr)
           continue
 
-        ret[module_name].append(strip_folder(srcdir, included_local))
+        ret[module_name]['fragments'].append(
+          strip_folder(srcdir, included_local))
 
-  return ret
+  # Check for files that are (perhaps accidentally) included in multiple module
+  # files.
+  counts = Counter(get_all_files(ret))
+  for key, value in ret.items():
+    ret[key]['fragments'] = list(filter(lambda x: counts[x] == 1,
+                                        value['fragments']))
+
+  duplicated = list(dict(filter(lambda it: it[1] != 1,
+                                counts.items()))
+                    .keys())
+
+  return ret, duplicated
+
+
+def get_all_files(modulemapping):
+  """
+  Retrieve a generator for all the "fragment files" included into the modules
+  in the given modulemapping.
+  """
+  for v in modulemapping.values():
+    for f in v['fragments']:
+      yield f

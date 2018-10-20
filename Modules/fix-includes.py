@@ -28,8 +28,7 @@ if not os.path.isfile("CMakeLists.txt"):
   sys.exit(2)
 
 
-MODULEMAP = mapping.get_module_mapping(os.getcwd())
-MODULEMAP, DUPLICATES = utils.eliminate_dict_listvalue_duplicates(MODULEMAP)
+MODULEMAP, DUPLICATES = mapping.get_module_mapping(os.getcwd())
 INTRAMODULE_DEPENDENCY_MAP = {}
 
 if DUPLICATES:
@@ -37,20 +36,14 @@ if DUPLICATES:
         "had been removed from the mapping!", file=sys.stderr)
   print('\n'.join(DUPLICATES), file=sys.stderr)
 
-
-def __all_files_in_folder(desc=""):
-  """Wrapper function that returns a progressbar-decorated generator for
-  all files in the current tree."""
-  return tqdm(walk_folder(os.getcwd()),
-              unit='files',
-              desc=desc,
-              total=len(list(walk_folder(os.getcwd()))),
-              position=1)
-
-
 # First look for header files and handle the include directives that a
 # module fragment's header includes.
-for file in __all_files_in_folder(desc="Ordering headers"):
+import time
+headers = list(filter(HEADER_FILE.search, mapping.get_all_files(MODULEMAP)))
+for file in tqdm(headers,
+                 desc="Collecting includes",
+                 unit='headers',
+                 position=1):
   if not re.search(HEADER_FILE, file):
     continue
 
@@ -63,10 +56,11 @@ for file in __all_files_in_folder(desc="Ordering headers"):
                file=sys.stderr)
     continue
 
-  include.transform_includes_to_imports(file,
-                                        content,
-                                        MODULEMAP,
-                                        INTRAMODULE_DEPENDENCY_MAP)
+  include.filter_imports_from_includes(file,
+                                       content,
+                                       MODULEMAP,
+                                       INTRAMODULE_DEPENDENCY_MAP)
+  time.sleep(0.005)
 
 import json
 

@@ -1,5 +1,6 @@
 import codecs
 import os
+
 from utils import partition
 from utils.progress_bar import tqdm
 
@@ -15,14 +16,21 @@ def directive_to_filename(line):
     .rstrip(r'">')
 
 
-def transform_includes_to_imports(filename,
-                                  text,
-                                  modulemap,
-                                  intra_dependency_map):
+def filter_imports_from_includes(filename,
+                                 text,
+                                 modulemap,
+                                 intra_dependency_map):
   """
-  Handles rewriting '#include' directives to 'import' statements in the given
-  source text. The function retrieves and builds a dependency map which will
-  contain intramodule dependencies.
+  Using the given :param modulemap:, transform the :param text: into a source
+  code which does not contain '#include' statements to files that are mapped
+  to any module. (Includes that are not mapped to anything remain.)
+
+  :param modulemap: The modulemap is extended with the list of modules the
+  module should depend on after the includes are filtered.
+
+  :param intra_dependency_map: The function's call builds the intra-module
+  dependency map (which file within a module includes which other files in
+  the same module) into this variable.
   """
 
   # Get the "first" module from the module map read earlier which contains
@@ -33,7 +41,7 @@ def transform_includes_to_imports(filename,
   def __get_module(include):
     return next(
       filter(
-        lambda item: include in item[1],
+        lambda item: include in item[1]['fragments'],
         modulemap.items()),
       (None, None))[0]
 
@@ -57,6 +65,8 @@ def transform_includes_to_imports(filename,
                    desc=os.path.basename(filename),
                    position=0,
                    leave=False):
+    import time
+    time.sleep(0.01)
     included = directive_to_filename(line)
     if not included:
       continue
@@ -90,20 +100,17 @@ def transform_includes_to_imports(filename,
     else:
       found_used_modules.add(module)
 
-  if not found_used_modules:
-    return
+  if found_used_modules:
+    # Rewrite the file and eliminate the unneeded '#include' statements.
+    with codecs.open(filename, 'w', encoding='utf-8', errors='replace') as f:
+      if lines_to_keep:
+        f.write("/* Lines kept because these files don't seem to belong to a "
+                "module: */\n")
+        f.write('\n'.join(lines_to_keep))
+        f.write("\n\n")
+      f.write(''.join(other_lines))
 
-  # Write the "import" statements into the file.
-  with codecs.open(filename, 'w', encoding='utf-8', errors='replace') as f:
-    f.write("/* Automatically generated include list. */\n")
-    if lines_to_keep:
-      f.write("/* Lines kept because these files don't seem to belong to a "
-              "module: */\n")
-      f.write('\n'.join(lines_to_keep))
-      f.write('\n')
-
-    f.write('\n'.join(["import MODULE_NAME_" + mod + ';'
-                       for mod in found_used_modules]))
-
-    f.write('\n\n')
-    f.write(''.join(other_lines))
+    # Append the found modules to the modulemapping as a module's module
+    # dependency.
+    if self_module:
+      modulemap[self_module]['imported-modules'] |= found_used_modules
