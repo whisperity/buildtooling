@@ -18,7 +18,7 @@ if not os.path.isfile("CMakeLists.txt"):
 
 
 MODULEMAP, DUPLICATES = mapping.get_module_mapping(os.getcwd())
-DEPENDENY_MAP = mapping.DependencyMap(MODULEMAP)
+DEPENDENCY_MAP = mapping.DependencyMap(MODULEMAP)
 
 if DUPLICATES:
   print("Error: Some files are included into multiple modules. These files "
@@ -46,9 +46,15 @@ for file in tqdm(headers,
     continue
 
   new_text = include.filter_imports_from_includes(
-    file, content, MODULEMAP, DEPENDENY_MAP)
+    file, content, MODULEMAP, DEPENDENCY_MAP)
 
 print("\n")
+
+# Check if the modules involve a circular
+if not mapping.get_modules_circular_dependency(MODULEMAP, DEPENDENCY_MAP):
+  print("Error: Modules contain circular dependencies on each other.",
+        file=sys.stderr)
+  sys.exit(1)
 
 # Files can transitively and with the employment of header guards,
 # recursively include each other, which is not a problem in normal C++,
@@ -65,11 +71,11 @@ for module in tqdm(MODULEMAP,
 
   # By default, put every file known to be mapped into the module into
   # the list.
-  intramodule_dependencies = dict(map(lambda x: (x, set()),
+  intramodule_dependencies = dict(map(lambda x: (x, []),
                                       headers_in_module))
   # Then add the list of known dependencies from the previous built map.
   intramodule_dependencies.update(
-    DEPENDENY_MAP.get_intramodule_dependencies(module))
+    DEPENDENCY_MAP.get_intramodule_dependencies(module))
 
   mapping.write_topological_order(
     MODULEMAP.get_filename(module),

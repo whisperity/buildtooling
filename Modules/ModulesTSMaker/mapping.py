@@ -5,12 +5,11 @@ import sys
 from collections import Counter
 
 try:
-  import toposort
+  import networkx as nx
 except ImportError as e:
   print("Error! A dependency of this tool could not be satisfied. Please "
         "install the following Python package via 'pip' either to the "
         "system, or preferably create a virtualenv.")
-  print(str(e))
   raise
 
 from utils import strip_folder, walk_folder
@@ -89,6 +88,12 @@ class ModuleMapping():
 
     self._map[module]['imported-modules'].add(dependency)
 
+  def get_dependencies_of_module(self, module):
+    if module not in self:
+      raise KeyError("Cannot get fragments for a module that has not been "
+                     "added.")
+    return self._map[module]['imported-modules']
+
 
 class DependencyMap():
   """
@@ -143,6 +148,8 @@ class DependencyMap():
       ret[file] = set()
       for dependent_file in dependency_modules.get(module, []):
         ret[file].add(dependent_file)
+
+      ret[file] = list(ret[file])
 
     return ret
 
@@ -217,6 +224,25 @@ def get_module_mapping(srcdir):
   return mapping, duplicated
 
 
+def get_modules_circular_dependency(module_map, dependency_map):
+  """
+  """
+  try:
+    dependencies = dict(
+      map(lambda m: (m, module_map.get_dependencies_of_module(m)),
+          module_map))
+    graph = nx.DiGraph(dependencies)
+    list(nx.algorithms.dag.topological_sort(graph))
+
+    return True
+  except nx.NetworkXUnfeasible:
+    import json
+    print(json.dumps(list(nx.simple_cycles(graph)), indent=2))
+    print("Error! Circular dependency found between modules as of now.",
+          file=sys.stderr)
+
+  return False
+
 def write_topological_order(module_file,
                             fragments,
                             regex,
@@ -228,9 +254,9 @@ def write_topological_order(module_file,
   are satisfied without the use of header guards.
   """
   try:
-    topological = [list(files) for files in
-                   list(toposort.toposort(intramodule_dependencies))]
-  except toposort.CircularDependencyError:
+    graph = nx.DiGraph(intramodule_dependencies)
+    topological = list(nx.topological_sort(graph))
+  except nx.NetworkXUnfeasible:
     print("Error! Circular dependency found in header files used in module "
           "%s. Module file cannot be rewritten!" % module_file,
           file=sys.stderr)
@@ -260,15 +286,12 @@ def write_topological_order(module_file,
 
     # Rewrite this part to contain the topological order of headers.
     new_includes = []
-    for group in topological:
-      group.sort()
-      for file in group:
-        # Modules usually include files relative to the module file's own
-        # location, but the script knows them relative to the working directory
-        # at the start...
-        file = file.replace(os.path.dirname(module_file), '').lstrip('/')
-        new_includes.append("#include \"%s\"\n" % file)
-      new_includes.append('\n/* ---- */\n')
+    for file in topological:
+      # Modules usually include files relative to the module file's own
+      # location, but the script knows them relative to the working directory
+      # at the start...
+      file = file.replace(os.path.dirname(module_file), '').lstrip('/')
+      new_includes.append("#include \"%s\"\n" % file)
 
     lines = lines[:first_header_include] + \
             new_includes[:-1] + \
