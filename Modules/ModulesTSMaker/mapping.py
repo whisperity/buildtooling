@@ -17,8 +17,134 @@ from utils import strip_folder, walk_folder
 from utils.progress_bar import tqdm
 from . import include
 
-
 MODULE_MACRO = re.compile(r'FULL_NAME_(?P<name>[\w_\-\d]+)?;[\s]*$')
+
+
+class ModuleMapping():
+  """
+  A module mapping contains the list of fragment files, inclusion directives
+  that are known to be mapped into a particular module file.
+  """
+  def __init__(self):
+    self._map = dict()
+
+  def __contains__(self, module):
+    return module in self._map.keys()
+
+  def __len__(self):
+    return len(self._map.keys())
+
+  def __iter__(self):
+    return iter(self._map.keys())
+
+  def add_module(self, name, module_file):
+    if name not in self:
+      self._map[name] = {'file': module_file,
+                         'fragments': [],
+                         'imported-modules': set()
+                         }
+
+  def add_fragment(self, module, fragment_file):
+    if module not in self:
+      raise KeyError("Cannot add a fragment to a module that has not been "
+                     "added.")
+
+    self._map[module]['fragments'].append(fragment_file)
+
+  def get_filename(self, module):
+    if module not in self:
+      raise KeyError("Module '%s' not found in the module mapping." % module)
+    return self._map[module]['file']
+
+  def get_fragment_list(self, module):
+    if module not in self:
+      raise KeyError("Cannot get fragments for a module that has not been "
+                     "added.")
+    return self._map[module]['fragments']
+
+  def get_all_fragments(self):
+    """
+    Retrieve a generator for all the "fragment files" included into the modules
+    in the mapping.
+    """
+    for v in self._map.values():
+      for f in v['fragments']:
+        yield f
+
+  def get_modules_for_file(self, file):
+    """
+    Returns the list of modules where the given :param file: has been mapped to.
+    """
+    return map(lambda i: i[0],  # Return the key, the module's name.
+               filter(
+                 lambda i: file in i[1]['fragments'],
+                 self._map.items()))
+
+  def add_module_import(self, module, dependency):
+    if module not in self:
+      raise KeyError("Module '%s' not found in the module mapping." % module)
+    if dependency not in self:
+      raise KeyError("Module '%s' not found in the module mapping."
+                     % dependency)
+
+    self._map[module]['imported-modules'].add(dependency)
+
+
+class DependencyMap():
+  """
+  A dependency map contains information of dependencies of (module, file) pairs.
+  """
+  def __init__(self, module_mapping):
+    self._module_mapping = module_mapping
+    self._map = dict()
+
+  def __contains__(self, item):
+    """
+    Returns if a dependency is known for the given file, or module.
+    """
+    return item in self._map.keys() or any([item in module
+      for module in self._map])
+
+  def add_dependency(self, dependee, dependency):
+    """
+    Add the dependency that:param dependee: depends on :param dependency:
+    """
+    dependee_modules = self._module_mapping.get_modules_for_file(dependee)
+    dependency_modules = self._module_mapping.get_modules_for_file(dependency)
+
+    for mod in dependee_modules:
+      if mod not in self._map:
+        self._map[mod] = {}
+      if dependee not in self._map[mod]:
+        self._map[mod][dependee] = {}
+
+      for dep in dependency_modules:
+        if dep not in self._map[mod][dependee]:
+          self._map[mod][dependee][dep] = []
+        if dependency not in self._map[mod][dependee][dep]:
+          self._map[mod][dependee][dep].append(dependency)
+
+  def get_intramodule_dependencies(self, module):
+    """
+    Get the list of dependencies of files in :param module: which are also in
+    :param module:. In case of files that belong to :param module: but have no
+    dependencies, the returned set will be empty.
+
+    :return: A dictionary object containing a filename => set of filenames
+    mapping.
+    """
+    if module not in self._map:
+      return dict()
+
+    # To make sure the intramodule dependency map can be ordered and still
+    # contains every file needed (not just those that have dependencies)
+    ret = dict()
+    for file, dependency_modules in self._map[module].items():
+      ret[file] = set()
+      for dependent_file in dependency_modules.get(module, []):
+        ret[file].add(dependent_file)
+
+    return ret
 
 
 def get_module_mapping(srcdir):
@@ -26,7 +152,7 @@ def get_module_mapping(srcdir):
   Reads up the current working directory and create a mapping of which
   source file (as a module fragment) is mapped into which module.
   """
-  ret = {}
+  mapping = ModuleMapping()
 
   # Read the files and create the mapping.
   for file in tqdm(walk_folder(srcdir),
@@ -58,10 +184,7 @@ def get_module_mapping(srcdir):
         # Skip parsing the file if it was bogus.
         continue
 
-      ret[module_name] = {'file': file,
-                          'fragments': [],
-                          'imported-modules': set()
-                          }
+      mapping.add_module(module_name, file)
       f.seek(0)
       for line in f.readlines():
         included = include.directive_to_filename(line)
@@ -76,54 +199,44 @@ def get_module_mapping(srcdir):
                      file=sys.stderr)
           continue
 
-        ret[module_name]['fragments'].append(
-          strip_folder(srcdir, included_local))
+        mapping.add_fragment(module_name,
+                             strip_folder(srcdir, included_local))
 
   # Check for files that are (perhaps accidentally) included in multiple module
   # files.
-  counts = Counter(get_all_files(ret))
-  for key, value in ret.items():
-    ret[key]['fragments'] = list(filter(lambda x: counts[x] == 1,
-                                        value['fragments']))
+  counts = Counter(mapping.get_all_fragments())
+  for module in mapping:
+    fragments = mapping.get_fragment_list(module)
+    for file in list(filter(lambda x: counts[x] != 1, fragments)):
+      fragments.remove(file)
 
   duplicated = list(dict(filter(lambda it: it[1] != 1,
                                 counts.items()))
                     .keys())
 
-  return ret, duplicated
-
-
-def get_all_files(modulemapping):
-  """
-  Retrieve a generator for all the "fragment files" included into the modules
-  in the given modulemapping.
-  """
-  for v in modulemapping.values():
-    for f in v['fragments']:
-      yield f
+  return mapping, duplicated
 
 
 def write_topological_order(module_file,
                             fragments,
-                            header_regex,
+                            regex,
                             intramodule_dependencies):
   """
-  Calculate and write topological ordering of headers based on the built
-  intra-dependency map. This ensures that header file "fragments" included into
-  the same module will follow each other in an order that types introduced
-  in the local module and used there is satisfied.
+  Calculate and write topological ordering of files based on the built
+  intra-dependency map. This ensures that file "fragments" included into
+  the same module will follow each other in an order that depend on each other
+  are satisfied without the use of header guards.
   """
   try:
-    header_topological = [list(files) for files in
-                          list(toposort.toposort(intramodule_dependencies))]
+    topological = [list(files) for files in
+                   list(toposort.toposort(intramodule_dependencies))]
   except toposort.CircularDependencyError:
     print("Error! Circular dependency found in header files used in module "
-          "%s. Module file cannot be rewritten!" % module,
+          "%s. Module file cannot be rewritten!" % module_file,
           file=sys.stderr)
     return False
 
-  header_fragments = list(
-    filter(header_regex.search, fragments))
+  filtered_fragments = list(filter(regex.search, fragments))
   with codecs.open(module_file, 'r+',
                    encoding='utf-8', errors='replace') as f:
     lines = f.readlines()
@@ -132,22 +245,22 @@ def write_topological_order(module_file,
     # included.
     first_header_include, last_header_include = None, None
     for num, l in enumerate(lines):
-      if os.path.basename(header_fragments[0]) in l:
+      if os.path.basename(filtered_fragments[0]) in l:
         first_header_include = num
-      elif os.path.basename(header_fragments[-1]) in l:
+      elif os.path.basename(filtered_fragments[-1]) in l:
         last_header_include = num
         break
 
     if not first_header_include or not last_header_include:
       print("Error! Module file '%s' included %s, %s at first read,"
             "but the directive cannot be found..."
-            % (module_file, header_fragments[0], header_fragments[-1]),
+            % (module_file, filtered_fragments[0], filtered_fragments[-1]),
             file=sys.stderr)
       return False
 
     # Rewrite this part to contain the topological order of headers.
     new_includes = []
-    for group in header_topological:
+    for group in topological:
       group.sort()
       for file in group:
         # Modules usually include files relative to the module file's own
@@ -155,7 +268,7 @@ def write_topological_order(module_file,
         # at the start...
         file = file.replace(os.path.dirname(module_file), '').lstrip('/')
         new_includes.append("#include \"%s\"\n" % file)
-      new_includes.append('\n')
+      new_includes.append('\n/* ---- */\n')
 
     lines = lines[:first_header_include] + \
             new_includes[:-1] + \

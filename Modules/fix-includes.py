@@ -18,7 +18,7 @@ if not os.path.isfile("CMakeLists.txt"):
 
 
 MODULEMAP, DUPLICATES = mapping.get_module_mapping(os.getcwd())
-INTRAMODULE_DEPENDENCY_MAP = {}
+DEPENDENY_MAP = mapping.DependencyMap(MODULEMAP)
 
 if DUPLICATES:
   print("Error: Some files are included into multiple modules. These files "
@@ -28,7 +28,7 @@ if DUPLICATES:
 # First look for header files and handle the include directives that a
 # module fragment's header includes.
 import time
-headers = list(filter(HEADER_FILE.search, mapping.get_all_files(MODULEMAP)))
+headers = list(filter(HEADER_FILE.search, MODULEMAP.get_all_fragments()))
 for file in tqdm(headers,
                  desc="Collecting includes",
                  unit='headers',
@@ -45,18 +45,34 @@ for file in tqdm(headers,
                file=sys.stderr)
     continue
 
-  include.filter_imports_from_includes(file,
-                                       content,
-                                       MODULEMAP,
-                                       INTRAMODULE_DEPENDENCY_MAP)
+  new_text = include.filter_imports_from_includes(
+    file, content, MODULEMAP, DEPENDENY_MAP)
 
 print("\n")
 
-# Fix the headers in the module file so they are in a topological order.
-# This ensures that intra-module dependencies in the order of the module's
-# headers' inclusion are satisfied.
-for module, dependencies in INTRAMODULE_DEPENDENCY_MAP.items():
-  mapping.write_topological_order(MODULEMAP[module]['file'],
-                                  MODULEMAP[module]['fragments'],
-                                  HEADER_FILE,
-                                  dependencies)
+# Files can transitively and with the employment of header guards,
+# recursively include each other, which is not a problem in normal C++,
+# but for imports this must be evaded, as the files are put into a module
+# wrapper, which should not include itself.
+# However, for this module "wrapper" file to work, the includes of the
+# module "fragments" (which are rewritten by this script) must be in
+# a good order.
+for module in tqdm(MODULEMAP,
+                   desc="Sorting module includes",
+                   unit='files'):
+  files_in_module = MODULEMAP.get_fragment_list(module)
+  headers_in_module = list(filter(HEADER_FILE.search, files_in_module))
+
+  # By default, put every file known to be mapped into the module into
+  # the list.
+  intramodule_dependencies = dict(map(lambda x: (x, set()),
+                                      headers_in_module))
+  # Then add the list of known dependencies from the previous built map.
+  intramodule_dependencies.update(
+    DEPENDENY_MAP.get_intramodule_dependencies(module))
+
+  mapping.write_topological_order(
+    MODULEMAP.get_filename(module),
+    files_in_module,
+    HEADER_FILE,
+    intramodule_dependencies)
