@@ -1,4 +1,5 @@
 import codecs
+import itertools
 import os
 import re
 import sys
@@ -72,7 +73,7 @@ class ModuleMapping():
 
   def get_modules_for_file(self, file):
     """
-    Returns the list of modules where the given :param file: has been mapped to.
+    Returns the list of modules where the given :param file: was mapped into.
     """
     return map(lambda i: i[0],  # Return the key, the module's name.
                filter(
@@ -97,7 +98,8 @@ class ModuleMapping():
 
 class DependencyMap():
   """
-  A dependency map contains information of dependencies of (module, file) pairs.
+  A dependency map contains information of dependencies of (module, file)
+  pairs.
   """
   def __init__(self, module_mapping):
     self._module_mapping = module_mapping
@@ -108,20 +110,20 @@ class DependencyMap():
     Returns if a dependency is known for the given file, or module.
     """
     return item in self._map.keys() or any([item in module
-      for module in self._map])
+                                            for module in self._map])
 
   def add_dependency(self, dependee, dependency):
     """
-    Add the dependency that:param dependee: depends on :param dependency:
+    Add the dependency that :param dependee: depends on :param dependency:.
     """
     dependee_modules = self._module_mapping.get_modules_for_file(dependee)
     dependency_modules = self._module_mapping.get_modules_for_file(dependency)
 
     for mod in dependee_modules:
       if mod not in self._map:
-        self._map[mod] = {}
+        self._map[mod] = dict()
       if dependee not in self._map[mod]:
-        self._map[mod][dependee] = {}
+        self._map[mod][dependee] = dict()
 
       for dep in dependency_modules:
         if dep not in self._map[mod][dependee]:
@@ -129,29 +131,33 @@ class DependencyMap():
         if dependency not in self._map[mod][dependee][dep]:
           self._map[mod][dependee][dep].append(dependency)
 
-  def get_intramodule_dependencies(self, module):
+  def get_files_creating_dependency_between(self, from_module, to_module):
     """
-    Get the list of dependencies of files in :param module: which are also in
-    :param module:. In case of files that belong to :param module: but have no
-    dependencies, the returned set will be empty.
+    Retrieve the list of files that are the reason that :param from_module:
+    depends on :param to_module:.
 
     :return: A dictionary object containing a filename => set of filenames
     mapping.
     """
-    if module not in self._map:
-      return dict()
-
-    # To make sure the intramodule dependency map can be ordered and still
-    # contains every file needed (not just those that have dependencies)
     ret = dict()
-    for file, dependency_modules in self._map[module].items():
-      ret[file] = set()
-      for dependent_file in dependency_modules.get(module, []):
-        ret[file].add(dependent_file)
+    for from_file in self._map.get(from_module, []):
+      ret[from_file] = set()
+      for to_file in self._map[from_module][from_file].get(to_module, []):
+        ret[from_file].add(to_file)
 
-      ret[file] = list(ret[file])
-
+      if len(ret[from_file]) == 0:
+        del ret[from_file]
     return ret
+
+  def get_intramodule_dependencies(self, module):
+    """
+    Get the list of dependencies of files in :param module: which are also in
+    :param module:.
+
+    :return: A dictionary object containing a filename => set of filenames
+    mapping.
+    """
+    return self.get_files_creating_dependency_between(module, module)
 
 
 def get_module_mapping(srcdir):
@@ -227,21 +233,34 @@ def get_module_mapping(srcdir):
 def get_modules_circular_dependency(module_map, dependency_map):
   """
   """
-  try:
-    dependencies = dict(
-      map(lambda m: (m, module_map.get_dependencies_of_module(m)),
-          module_map))
-    graph = nx.DiGraph(dependencies)
-    list(nx.algorithms.dag.topological_sort(graph))
-
+  dependencies = dict(
+    map(lambda m: (m, module_map.get_dependencies_of_module(m)),
+        module_map))
+  graph = nx.DiGraph(dependencies)
+  if nx.is_directed_acyclic_graph(graph):
     return True
-  except nx.NetworkXUnfeasible:
-    import json
-    print(json.dumps(list(nx.simple_cycles(graph)), indent=2))
-    print("Error! Circular dependency found between modules as of now.",
-          file=sys.stderr)
+
+  cycles = list(nx.simple_cycles(graph))
+  smallest_cycles_length = min([len(c) for c in cycles])
+  for cycle in filter(lambda x: len(x) == smallest_cycles_length, cycles):
+    print("Circular dependency between modules found on the following path:")
+    print("    %s" % ' -> '.join(cycle + [cycle[0]]))
+
+    # Make sure it is "actually" a cycle.
+    cycle.append(cycle[0])
+
+    for a, b in itertools.zip_longest(cycle[:-1], cycle[1:]):
+      print(a, b)
+      files = dependency_map.get_files_creating_dependency_between(a, b)
+      for k, v in files.items():
+        files[k] = list(v)
+      import json
+      print(json.dumps(files, indent=2))
+
+    break
 
   return False
+
 
 def write_topological_order(module_file,
                             fragments,

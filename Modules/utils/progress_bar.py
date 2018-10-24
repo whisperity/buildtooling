@@ -35,6 +35,5 @@ except ImportError:
     def write(*args, **kwargs):
       return print(*args, **kwargs)
 
-
   print("Python library 'tqdm' not found, no progress will be printed.",
         file=sys.stderr)

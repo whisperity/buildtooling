@@ -29,8 +29,8 @@ def filter_imports_from_includes(filename,
   module should depend on after the includes are filtered.
 
   :param dependency_map: The function's call builds the dependency map, which
-  specifies that what files belonging to a module depend on what files belonging
-  to other modules.
+  specifies that what files belonging to a module depend on what files
+  belonging to other modules.
 
   :returns: The transformed source :param text: from which includes had been
   removed.
