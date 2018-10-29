@@ -29,7 +29,7 @@ except ImportError:
       return self.total if self.iterable is None else \
         (self.iterable.shape[0] if hasattr(self.iterable, "shape")
          else len(self.iterable) if hasattr(self.iterable, "__len__")
-        else getattr(self, "total", None))
+         else getattr(self, "total", None))
 
     @staticmethod
     def write(*args, **kwargs):

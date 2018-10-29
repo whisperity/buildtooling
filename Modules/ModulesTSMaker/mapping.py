@@ -3,7 +3,8 @@ import itertools
 import os
 import re
 import sys
-from collections import Counter
+from collections import Counter, deque
+from operator import itemgetter
 
 try:
   import networkx as nx
@@ -75,7 +76,7 @@ class ModuleMapping():
     """
     Returns the list of modules where the given :param file: was mapped into.
     """
-    return map(lambda i: i[0],  # Return the key, the module's name.
+    return map(itemgetter(0),  # Return the key, the module's name.
                filter(
                  lambda i: file in i[1]['fragments'],
                  self._map.items()))
@@ -233,16 +234,53 @@ def get_module_mapping(srcdir):
 def get_modules_circular_dependency(module_map, dependency_map):
   """
   """
-  dependencies = dict(
-    map(lambda m: (m, module_map.get_dependencies_of_module(m)),
-        module_map))
+  def _map_to_dependencies(module):
+    """
+    Helper function to create a dictionary key mapping :param module: to its
+    dependencies.
+    """
+    return (module,
+            # Return the dependencies as a list, sorted, as opposed to a set,
+            # so the order is deterministic.
+            list(sorted(module_map.get_dependencies_of_module(module))))
+
+  dependencies = dict(map(_map_to_dependencies, module_map))
   graph = nx.DiGraph(dependencies)
   if nx.is_directed_acyclic_graph(graph):
     return True
 
   cycles = list(nx.simple_cycles(graph))
   smallest_cycles_length = min([len(c) for c in cycles])
-  for cycle in filter(lambda x: len(x) == smallest_cycles_length, cycles):
+  smallest_cycles = list(
+    filter(lambda l: len(l) == smallest_cycles_length, cycles))
+
+  # Unfortunately, it seems that "simple_cycles" isn't deterministic on the
+  # "inner" order of the result - the order of nodes in the cycle. To make the
+  # results more reproducible and debuggable, we sacrifice some CPU time here
+  # to keep a consistent order.
+  for i, lst in enumerate(smallest_cycles):
+    common_prefix = os.path.commonprefix(lst)
+    sort_based_on_char_idx = len(common_prefix)
+
+    # Expand the strings in the list so the sort character index is always
+    # in range. (' ' < any alphanumerical letter)
+    l = list(map(lambda s: s.ljust(sort_based_on_char_idx + 1), lst))
+
+    # We must not just sort the list because this list represents an ordered
+    # cycle in the graph! Instead, rotate that the "smallest" key is the first.
+    min_idx, _ = min(enumerate(l), key=itemgetter(1))
+    d = deque(l)
+    d.rotate(-min_idx)
+
+    smallest_cycles[i] = list(map(lambda s: s.strip(), d))
+
+  # Now create an alphanumeric order of the cycles which respects every
+  # element, so the list is ordered based on sublists' 1st element, then
+  # within each group the 2nd, etc.
+  smallest_cycles.sort(key=lambda l: ','.join(l))
+  import json
+  print(json.dumps(smallest_cycles, indent=2))
+  for cycle in smallest_cycles:
     print("Circular dependency between modules found on the following path:")
     print("    %s" % ' -> '.join(cycle + [cycle[0]]))
 
@@ -255,9 +293,10 @@ def get_modules_circular_dependency(module_map, dependency_map):
       for k, v in files.items():
         files[k] = list(v)
       import json
-      print(json.dumps(files, indent=2))
+      #print(json.dumps(files, indent=2))
 
-    break
+    # Only show the "first" dependency for now.
+    return False
 
   return False
 
