@@ -32,7 +32,7 @@ then
     echo "Current configured shared memory is '${CUR_SIZE}' bytes."
     echo
     echo "Pump mode will be disabled! Please create a new container with the "
-    echo "extra option '--shm-size ${CUR_SIZE}' specified."
+    echo "extra option '--shm-size ${MIN_SIZE}' specified."
 
     PUMP_BINARY=$(which distcc-pump)
     # Just purge the 'pump' binary completely...
@@ -41,7 +41,7 @@ then
     cat << EOF > ${PUMP_BINARY}
 #!/bin/bash
 echo "DistCC Pump mode is disabled because shared memory is too small for this project."
-echo "Please start a new container with '--shm-size ${CUR_SIZE}' specified."
+echo "Please start a new container with '--shm-size ${MIN_SIZE}' specified."
 exit 1
 EOF
     chmod +x ${PUMP_BINARY}

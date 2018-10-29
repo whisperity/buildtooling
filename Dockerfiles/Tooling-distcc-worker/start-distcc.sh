@@ -18,7 +18,7 @@ fi
 
 if [ $# -ne 0 ]
 then
-  echo "Overridden start arguemnts found - executing the command itself." >&2
+  echo "Overridden start arguments found - executing the command itself." >&2
   exec "$@"
 else
   # Create a DistCC daemon.
