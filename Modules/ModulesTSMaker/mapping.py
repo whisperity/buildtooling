@@ -234,6 +234,7 @@ def get_module_mapping(srcdir):
 def get_modules_circular_dependency(module_map, dependency_map):
   """
   """
+
   def _map_to_dependencies(module):
     """
     Helper function to create a dictionary key mapping :param module: to its
@@ -244,6 +245,30 @@ def get_modules_circular_dependency(module_map, dependency_map):
             # so the order is deterministic.
             list(sorted(module_map.get_dependencies_of_module(module))))
 
+  def _rotate_cycles(lst):
+    """
+    Helper function to rotate a list of cycles represented as lists.
+    "simple_cycles" isn't deterministic on the "inner" order of the result -
+    the order of nodes in the cycle. To make the results more reproducible
+    and debuggable, we sacrifice some CPU time here to keep a consistent order.
+    """
+    for i, c in enumerate(lst):
+      common_prefix = os.path.commonprefix(c)
+      sort_based_on_char_idx = len(common_prefix)
+
+      # Expand the strings in the list so the sort character index is always
+      # in range. (' ' < any alphanumerical letter)
+      expand = list(map(lambda s: s.ljust(sort_based_on_char_idx + 1), c))
+
+      # We must not just sort the list because this list represents an ordered
+      # cycle in the graph! Instead, rotate that the "smallest" key is the
+      # first.
+      min_idx, _ = min(enumerate(expand), key=itemgetter(1))
+      d = deque(expand)
+      d.rotate(-min_idx)
+
+      lst[i] = list(map(lambda s: s.strip(), d))
+
   dependencies = dict(map(_map_to_dependencies, module_map))
   graph = nx.DiGraph(dependencies)
   if nx.is_directed_acyclic_graph(graph):
@@ -253,51 +278,62 @@ def get_modules_circular_dependency(module_map, dependency_map):
   smallest_cycles_length = min([len(c) for c in cycles])
   smallest_cycles = list(
     filter(lambda l: len(l) == smallest_cycles_length, cycles))
-
-  # Unfortunately, it seems that "simple_cycles" isn't deterministic on the
-  # "inner" order of the result - the order of nodes in the cycle. To make the
-  # results more reproducible and debuggable, we sacrifice some CPU time here
-  # to keep a consistent order.
-  for i, lst in enumerate(smallest_cycles):
-    common_prefix = os.path.commonprefix(lst)
-    sort_based_on_char_idx = len(common_prefix)
-
-    # Expand the strings in the list so the sort character index is always
-    # in range. (' ' < any alphanumerical letter)
-    l = list(map(lambda s: s.ljust(sort_based_on_char_idx + 1), lst))
-
-    # We must not just sort the list because this list represents an ordered
-    # cycle in the graph! Instead, rotate that the "smallest" key is the first.
-    min_idx, _ = min(enumerate(l), key=itemgetter(1))
-    d = deque(l)
-    d.rotate(-min_idx)
-
-    smallest_cycles[i] = list(map(lambda s: s.strip(), d))
+  _rotate_cycles(smallest_cycles)
 
   # Now create an alphanumeric order of the cycles which respects every
   # element, so the list is ordered based on sublists' 1st element, then
   # within each group the 2nd, etc.
   smallest_cycles.sort(key=lambda l: ','.join(l))
-  import json
-  print(json.dumps(smallest_cycles, indent=2))
-  for cycle in smallest_cycles:
+
+  COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
+            '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
+            '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
+            '#000075', '#808080', '#ffffff', '#000000']
+
+  for i, cycle in enumerate(smallest_cycles):
+    G = nx.DiGraph()
+
     print("Circular dependency between modules found on the following path:")
     print("    %s" % ' -> '.join(cycle + [cycle[0]]))
 
     # Make sure it is "actually" a cycle.
     cycle.append(cycle[0])
 
+    module_to_file = {}
+
     for a, b in itertools.zip_longest(cycle[:-1], cycle[1:]):
+      if a not in module_to_file:
+        module_to_file[a] = []
+      if b not in module_to_file:
+        module_to_file[b] = []
+
       print(a, b)
       files = dependency_map.get_files_creating_dependency_between(a, b)
-      for k, v in files.items():
-        files[k] = list(v)
+      for k, s in files.items():
+        files[k] = list(s)
+        module_to_file[a].append(k)
+        module_to_file[b].extend(s)
+
+        for v in s:
+          G.add_edge(k, v)
+
       import json
-      #print(json.dumps(files, indent=2))
+      print(json.dumps(files, indent=2))
 
-    # Only show the "first" dependency for now.
-    return False
+    import matplotlib.pyplot
+    fig = matplotlib.pyplot.figure(i + 1)
+    pos = nx.nx_pydot.graphviz_layout(G)
+    for idx, i in enumerate(module_to_file.items()):
+      m, fs = i
+      nx.draw_networkx_nodes(G, pos, nodelist=fs, node_color=COLORS[idx])
+      nx.draw_networkx_edges(G, pos,
+                             edgelist=G.out_edges(fs), edge_color=COLORS[idx])
 
+    nx.draw_networkx_labels(G, pos)
+    matplotlib.pyplot.axis('off')
+    fig.canvas.set_window_title(' -> '.join(cycle))
+
+  matplotlib.pyplot.show()
   return False
 
 
