@@ -1,10 +1,13 @@
 import codecs
 import itertools
+import json
 import os
 import re
 import sys
 from collections import Counter, deque
 from operator import itemgetter
+
+import matplotlib.pyplot
 
 try:
   import networkx as nx
@@ -269,6 +272,42 @@ def get_modules_circular_dependency(module_map, dependency_map):
 
       lst[i] = list(map(lambda s: s.strip(), d))
 
+  def _draw_dependency_graph(cycle_graph):
+    """
+    Helper function that creates a visualisation graph of the includes in the
+    :param cycle_graph:.
+    """
+    COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
+              '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
+              '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
+              '#000075', '#808080', '#ffffff', '#000000']
+
+    # To be able to colour individual files belonging to the same module with
+    # the same colour, this map is needed.
+    module_to_file = {}
+    for filename in cycle_graph.nodes:
+      for module in module_map.get_modules_for_file(filename):
+        mtf_l = module_to_file.get(module, list())
+        if len(mtf_l) == 0:
+          module_to_file[module] = mtf_l
+        mtf_l.append(filename)
+
+    pos = nx.nx_pydot.graphviz_layout(cycle_graph)
+    for idx, item in enumerate(module_to_file.items()):
+      module, files = item
+      nx.draw_networkx_nodes(cycle_graph, pos,
+                             nodelist=files,
+                             node_color=COLORS[idx])
+      nx.draw_networkx_edges(cycle_graph, pos,
+                             edgelist=cycle_graph.out_edges(files),
+                             edge_color=COLORS[idx])
+
+    nx.draw_networkx_labels(cycle_graph, pos)
+    matplotlib.pyplot.axis('off')
+
+    # (Blocking call here.)
+    matplotlib.pyplot.show()
+
   dependencies = dict(map(_map_to_dependencies, module_map))
   graph = nx.DiGraph(dependencies)
   if nx.is_directed_acyclic_graph(graph):
@@ -285,55 +324,47 @@ def get_modules_circular_dependency(module_map, dependency_map):
   # within each group the 2nd, etc.
   smallest_cycles.sort(key=lambda l: ','.join(l))
 
-  COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
-            '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
-            '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
-            '#000075', '#808080', '#ffffff', '#000000']
+  print("Found %d smallest cycles of length %d between modules."
+        % (len(smallest_cycles), smallest_cycles_length))
 
-  for i, cycle in enumerate(smallest_cycles):
-    G = nx.DiGraph()
-
-    print("Circular dependency between modules found on the following path:")
-    print("    %s" % ' -> '.join(cycle + [cycle[0]]))
-
+  for i, cycle in tqdm(enumerate(smallest_cycles),
+                       desc="Breaking cycles...",
+                       total=len(smallest_cycles),
+                       unit='cycle'):
     # Make sure it is "actually" a cycle.
     cycle.append(cycle[0])
 
-    module_to_file = {}
+    tqdm.write("Circular dependency between modules found on the following "
+               "path:\n"
+               "    %s" % ' -> '.join(cycle))
 
-    for a, b in itertools.zip_longest(cycle[:-1], cycle[1:]):
-      if a not in module_to_file:
-        module_to_file[a] = []
-      if b not in module_to_file:
-        module_to_file[b] = []
+    cycle_file_graph = nx.DiGraph()
+    for module_A, module_B in itertools.zip_longest(cycle[:-1], cycle[1:]):
+      tqdm.write("Between modules %s -> %s, the following files include each "
+                 "other:" % (module_A, module_B))
+      files = dependency_map.get_files_creating_dependency_between(module_A,
+                                                                   module_B)
+      for file_in_A, files_in_B in files.items():
+        files[file_in_A] = list(files_in_B)  # Set to list transformation.
+        for file_in_B in files_in_B:
+          tqdm.write("%s: %s" % (file_in_A, file_in_B))
+          cycle_file_graph.add_edge(file_in_A, file_in_B)
 
-      print(a, b)
-      files = dependency_map.get_files_creating_dependency_between(a, b)
-      for k, s in files.items():
-        files[k] = list(s)
-        module_to_file[a].append(k)
-        module_to_file[b].extend(s)
+    if nx.is_weakly_connected(cycle_file_graph):
+      print("Fatal error! The dependency graph for circular module "
+            "dependency\n"
+            "    %s\n"
+            "is fully connected. Modules cannot be split."
+            % ' -> '.join(cycle),
+            file=sys.stderr)
+      print("The dependencies that create the cycle is spanned by the "
+            "following files:", file=sys.stderr)
+      print(json.dumps(nx.to_dict_of_lists(cycle_file_graph), indent=2),
+            file=sys.stderr)
+      _draw_dependency_graph(cycle_file_graph)
+      # TODO: Just fail here quickly if we fixed handling single components.
+      # return False
 
-        for v in s:
-          G.add_edge(k, v)
-
-      import json
-      print(json.dumps(files, indent=2))
-
-    import matplotlib.pyplot
-    fig = matplotlib.pyplot.figure(i + 1)
-    pos = nx.nx_pydot.graphviz_layout(G)
-    for idx, i in enumerate(module_to_file.items()):
-      m, fs = i
-      nx.draw_networkx_nodes(G, pos, nodelist=fs, node_color=COLORS[idx])
-      nx.draw_networkx_edges(G, pos,
-                             edgelist=G.out_edges(fs), edge_color=COLORS[idx])
-
-    nx.draw_networkx_labels(G, pos)
-    matplotlib.pyplot.axis('off')
-    fig.canvas.set_window_title(' -> '.join(cycle))
-
-  matplotlib.pyplot.show()
   return False
 
 

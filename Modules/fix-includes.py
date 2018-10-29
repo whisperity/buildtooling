@@ -27,7 +27,6 @@ if DUPLICATES:
 
 # First look for header files and handle the include directives that a
 # module fragment's header includes.
-import time
 headers = list(filter(HEADER_FILE.search, MODULEMAP.get_all_fragments()))
 for file in tqdm(headers,
                  desc="Collecting includes",
