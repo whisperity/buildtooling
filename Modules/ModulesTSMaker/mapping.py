@@ -351,6 +351,8 @@ def get_modules_circular_dependency(module_map, dependency_map):
                "path:\n"
                "    %s" % ' -> '.join(cycle))
 
+    # Create a graph that contains the files that span the dependencies that
+    # resulted in the cycle.
     cycle_file_graph = nx.DiGraph()
     for module_A, module_B in itertools.zip_longest(cycle[:-1], cycle[1:]):
       tqdm.write("Between modules %s -> %s, the following files include each "
@@ -368,48 +370,95 @@ def get_modules_circular_dependency(module_map, dependency_map):
     module_to_file = module_map.filter_modules_for_fragments(
       cycle_file_graph.nodes)
 
+    if nx.is_weakly_connected(cycle_file_graph):
+      print("Fatal error! The dependency graph for circular module "
+            "dependency\n"
+            "    %s\n"
+            "is fully connected. Modules cannot be split."
+            % ' -> '.join(cycle),
+            file=sys.stderr)
+      print("The dependencies that create the cycle is spanned by the "
+            "following files:", file=sys.stderr)
+      print(json.dumps(nx.to_dict_of_lists(cycle_file_graph), indent=2),
+            file=sys.stderr)
+      # _draw_dependency_graph(cycle_file_graph, module_to_file)
+      # TODO: Record the fact that resolving the dependency is impossible!
+      continue
+
     # Create a flow graph that has a node for each module in the cycle,
     # mapping the files belonging to a module with a directed edge, and also
     # containing the dependency edges.
     # If a file is dependent upon and also depends on others, it is added
     # multiple times, once for the incoming, and once for the outgoing edges.
     flow = nx.DiGraph()
+    for module in cycle[:-1]:
+      if module == cycle[0]:
+        # Create a "start" and "end" node for the source and sink of the cycle.
+        dependee_node = module + ' ->'
+        dependency_node = '-> ' + module
 
-    # Handle the source and sink of the dependency graph.
-    flow.add_node(cycle[0] + ' ->')
-    flow.add_node('-> ' + cycle[0])
-    for file_in_module in module_to_file[cycle[0]]:
-      if cycle_file_graph.out_degree(file_in_module) > 0:
-        # file_in_module depends on other files.
-        flow.add_node(file_in_module + ' ->')
-        flow.add_edge(cycle[0] + ' ->',
-                      file_in_module + ' ->')  # capacity: infinite
-      if cycle_file_graph.in_degree(file_in_module) > 0:
-        # file_in_module is a dependency of other files.
-        flow.add_node('-> ' + file_in_module)
-        flow.add_edge('-> ' + file_in_module,
-                      '-> ' + cycle[0])  # capacity: infinite
+        flow.add_node(dependee_node)
+        flow.add_node(dependency_node)
+      else:
+        # Inner elements only get one node.
+        dependee_node = dependency_node = '-> ' + module + ' ->'
+        flow.add_node(dependee_node)
 
-    # Handle the inner nodes of the cycle.
-    for module in cycle[1:-1]:
+      # filename -> (#-of-files-f-depends-upon, #-of-files-depending-on-f)
+      degree_map = dict(
+        map(
+          lambda filename: (filename,
+                            (cycle_file_graph.in_degree(filename),
+                             cycle_file_graph.out_degree(filename))),
+          module_to_file[module]))
+      any_file_on_both_sides = any([d[0] > 0 and d[1] > 0 for d
+                                    in degree_map.values()])
+
       for file_in_module in module_to_file[module]:
-        in_degree = cycle_file_graph.in_degree(file_in_module)
-        out_degree = cycle_file_graph.out_degree(file_in_module)
-
-        if out_degree > 0:
-          # file_in_module depends on other files.
-          flow.add_node(file_in_module + ' ->')
+        in_degree = degree_map[file_in_module][0]
+        out_degree = degree_map[file_in_module][1]
 
         if in_degree > 0:
           # file_in_module is a dependency of other files.
           flow.add_node('-> ' + file_in_module)
 
-        if in_degree > 0 and out_degree > 0:
-          # If the file is both a dependency and depends on others, link the
-          # two nodes.
-          flow.add_edge('-> ' + file_in_module,
-                        file_in_module + ' ->',
-                        capacity=1)
+          if module == cycle[0]:
+            # (If the file is in the cycle's sidemost module, write it to the
+            # source.)
+            flow.add_edge('-> ' + file_in_module,
+                          dependency_node)
+
+        if out_degree > 0:
+          # file_in_module depends on other files.
+          flow.add_node(file_in_module + ' ->')
+
+          if module == cycle[0]:
+            # (If the file is in the cycle's sidemost module, write it to the
+            # sink.)
+            flow.add_edge(dependee_node,
+                          file_in_module + ' ->')
+
+        if module != cycle[0]:
+          if in_degree > 0 and out_degree > 0:
+            # If the file is both a dependency and depends on others, link the
+            # two file nodes.
+            flow.add_edge('-> ' + file_in_module,
+                          file_in_module + ' ->')
+          else:
+            # Otherwise link the file to the module on the "side" it can be
+            # appropriate.
+            # (Here, to ensure the flow cuts at the right position, we
+            # limit the flow that can go through a file.)
+            if out_degree > 0:
+              flow.add_edge(dependee_node,
+                            file_in_module + ' ->',
+                            capacity=out_degree if any_file_on_both_sides
+                            else float('inf'))
+            if in_degree > 0:
+              flow.add_edge('-> ' + file_in_module,
+                            dependency_node,
+                            capacity=in_degree if any_file_on_both_sides
+                            else float('inf'))
 
     # Add the actual dependency edges between the files.
     for dependency_edge in cycle_file_graph.edges:
@@ -431,24 +480,34 @@ def get_modules_circular_dependency(module_map, dependency_map):
                  '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
       module_to_colour = {}
 
-      # Draw the module node of the cycle's two ends.
-      nx.draw_networkx_nodes(flow, pos,
-                             nodelist=[cycle_start + ' ->',
-                                       '-> ' + cycle_start],
-                             node_color=COLOURS[0],
-                             node_shape='s')
-
-      nx.draw_networkx_labels(flow, pos,
-                              labels=dict(
-                                map(lambda e:
-                                    (e, e.replace(' ->', '')
-                                     .replace('-> ', '')),
-                                    [cycle_start + ' ->',
-                                     '-> ' + cycle_start])),
-                              font_color='black')
-
       for i, module in enumerate(sorted(module_to_file.keys())):
         module_to_colour[module] = COLOURS[i]
+
+        # Draw the nodes of the module.
+        module_node_colour = 'black' if module != cycle_start else 'blue'
+
+        module_node_list = ['-> ' + module + ' ->'] if module != cycle_start \
+          else [module + ' ->', '-> ' + module]
+        module_node_dict = dict(map(lambda e: (e, e), module_node_list))
+
+        nx.draw_networkx_nodes(flow, pos,
+                               nodelist=module_node_list,
+                               node_color=COLOURS[i],
+                               node_shape='s')
+
+        nx.draw_networkx_labels(flow, pos,
+                                labels=module_node_dict,
+                                font_color=module_node_colour)
+
+        # # Draw the link between the module's two sides.
+        # # (Don't close up the cycle, however.
+        # if ('-> ' + module, module + ' ->') in flow.edges \
+        #       and module != cycle_start:
+        #   nx.draw_networkx_edges(flow, pos,
+        #                          edgelist=[('-> ' + module,
+        #                                     module + ' ->')],
+        #                          edge_color=module_node_colour,
+        #                          alpha=0.75)
 
         # Draw the file nodes belonging to the iterated module.
         dependees = list(filter(lambda e: e in flow.nodes,
@@ -469,28 +528,41 @@ def get_modules_circular_dependency(module_map, dependency_map):
                                       dependees + dependencies)),
                                 font_color='#666666')
 
-        if module == cycle_start:
-          # ... and link them to the module node (in case of cycle's two end)
-          for dep in dependees:
-            if (module + ' ->', dep) in flow.edges:
+        # ... and link them to the module node ...
+        for dep in dependees:
+          edge_try = (module + ' ->', dep)
+          if edge_try in flow.edges:
+            nx.draw_networkx_edges(flow, pos,
+                                   edgelist=[edge_try],
+                                   edge_color='#dddddd')
+          else:
+            edge_try = ('-> ' + module + ' ->', dep)
+            if edge_try in flow.edges:
               nx.draw_networkx_edges(flow, pos,
-                                     edgelist=[(module + ' ->', dep)],
-                                     edge_color='#bbbbbb')
+                                     edgelist=[edge_try],
+                                     edge_color='#dddddd')
 
-          for dep in dependencies:
-            if (dep, '-> ' + module) in flow.edges:
+        for dep in dependencies:
+          edge_try = (dep, '-> ' + module)
+          if edge_try in flow.edges:
+            nx.draw_networkx_edges(flow, pos,
+                                   edgelist=[edge_try],
+                                   edge_color='#dddddd')
+          else:
+            edge_try = (dep, '-> ' + module + ' ->')
+            if edge_try in flow.edges:
               nx.draw_networkx_edges(flow, pos,
-                                     edgelist=[(dep, '-> ' + module)],
-                                     edge_color='#bbbbbb')
-        else:
-          # Or link them to each other, if the file appears on both sides
-          # of the module.
-          for file_in_module in module_to_file[module]:
-            self_edge = ('-> ' + file_in_module, file_in_module + ' ->')
-            if self_edge in flow.edges:
-              nx.draw_networkx_edges(flow, pos,
-                                     edgelist=[self_edge],
-                                     edge_color='#222222')
+                                     edgelist=[edge_try],
+                                     edge_color='#dddddd')
+
+        # ... and for files that appear on both sides of a module, link them
+        # to each other too.
+        for file_in_module in module_to_file[module]:
+          self_edge = ('-> ' + file_in_module, file_in_module + ' ->')
+          if self_edge in flow.edges:
+            nx.draw_networkx_edges(flow, pos,
+                                   edgelist=[self_edge],
+                                   edge_color='#666666')
 
       # Draw in the file dependencies.
       def _draw_edge(u, v):
@@ -504,7 +576,7 @@ def get_modules_circular_dependency(module_map, dependency_map):
           style = 'dashdot'
         else:
           from_module = next(module_map.get_modules_for_fragment(
-            u.replace(' ->', '')), None)
+            u.replace(' ->', '').replace('-> ', '')), None)
           colour = module_to_colour[from_module]
           width = 1.0
           style = 'solid'
@@ -524,23 +596,12 @@ def get_modules_circular_dependency(module_map, dependency_map):
     cut_value, partition = \
       nx.minimum_cut(flow, cycle[0] + ' ->', '-> ' + cycle[0])
 
+    print(cut_value)
+    print(json.dumps((list(partition[0]), list(partition[1])),
+                     indent=2))
+
     _visualise_flow_and_cut(i + 1, cycle[0], partition)
     matplotlib.pyplot.show()
-
-    if nx.is_weakly_connected(cycle_file_graph):
-      print("Fatal error! The dependency graph for circular module "
-            "dependency\n"
-            "    %s\n"
-            "is fully connected. Modules cannot be split."
-            % ' -> '.join(cycle),
-            file=sys.stderr)
-      print("The dependencies that create the cycle is spanned by the "
-            "following files:", file=sys.stderr)
-      print(json.dumps(nx.to_dict_of_lists(cycle_file_graph), indent=2),
-            file=sys.stderr)
-      _draw_dependency_graph(cycle_file_graph)
-      # TODO: Just fail here quickly if we fixed handling single components.
-      # return False
 
   return False
 
