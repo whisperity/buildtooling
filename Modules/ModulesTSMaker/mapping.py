@@ -374,25 +374,42 @@ def get_modules_circular_dependency(module_map, dependency_map):
     # If a file is dependent upon and also depends on others, it is added
     # multiple times, once for the incoming, and once for the outgoing edges.
     flow = nx.DiGraph()
-    for module in cycle[:-1]:  # Here only iterate the path, not the cycle.
-      flow.add_node(module + ' ->')
-      flow.add_node('-> ' + module)
 
+    # Handle the source and sink of the dependency graph.
+    flow.add_node(cycle[0] + ' ->')
+    flow.add_node('-> ' + cycle[0])
+    for file_in_module in module_to_file[cycle[0]]:
+      if cycle_file_graph.out_degree(file_in_module) > 0:
+        # file_in_module depends on other files.
+        flow.add_node(file_in_module + ' ->')
+        flow.add_edge(cycle[0] + ' ->',
+                      file_in_module + ' ->')  # capacity: infinite
+      if cycle_file_graph.in_degree(file_in_module) > 0:
+        # file_in_module is a dependency of other files.
+        flow.add_node('-> ' + file_in_module)
+        flow.add_edge('-> ' + file_in_module,
+                      '-> ' + cycle[0])  # capacity: infinite
+
+    # Handle the inner nodes of the cycle.
+    for module in cycle[1:-1]:
       for file_in_module in module_to_file[module]:
-        if cycle_file_graph.out_degree(file_in_module) > 0:
+        in_degree = cycle_file_graph.in_degree(file_in_module)
+        out_degree = cycle_file_graph.out_degree(file_in_module)
+
+        if out_degree > 0:
           # file_in_module depends on other files.
           flow.add_node(file_in_module + ' ->')
-          flow.add_edge(module + ' ->',
-                        file_in_module + ' ->')  # capacity: infinite
-        if cycle_file_graph.in_degree(file_in_module) > 0:
+
+        if in_degree > 0:
           # file_in_module is a dependency of other files.
           flow.add_node('-> ' + file_in_module)
-          flow.add_edge('-> ' + file_in_module,
-                        '-> ' + module)  # capacity: infinite
 
-      # Between each module there is a link (with infinite capacity) from
-      # dependency to dependee.
-      flow.add_edge('-> ' + module, module + ' ->')
+        if in_degree > 0 and out_degree > 0:
+          # If the file is both a dependency and depends on others, link the
+          # two nodes.
+          flow.add_edge('-> ' + file_in_module,
+                        file_in_module + ' ->',
+                        capacity=1)
 
     # Add the actual dependency edges between the files.
     for dependency_edge in cycle_file_graph.edges:
@@ -400,7 +417,7 @@ def get_modules_circular_dependency(module_map, dependency_map):
                     '-> ' + dependency_edge[1],
                     capacity=1)
 
-    def _visualise_flow_and_cut(idx, cut_module, partition):
+    def _visualise_flow_and_cut(idx, cycle_start, partition):
       """
       Helper function to visualise the flow graph and mark the cut created by
       :param partition:.
@@ -413,33 +430,27 @@ def get_modules_circular_dependency(module_map, dependency_map):
                  '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
                  '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
       module_to_colour = {}
+
+      # Draw the module node of the cycle's two ends.
+      nx.draw_networkx_nodes(flow, pos,
+                             nodelist=[cycle_start + ' ->',
+                                       '-> ' + cycle_start],
+                             node_color=COLOURS[0],
+                             node_shape='s')
+
+      nx.draw_networkx_labels(flow, pos,
+                              labels=dict(
+                                map(lambda e:
+                                    (e, e.replace(' ->', '')
+                                     .replace('-> ', '')),
+                                    [cycle_start + ' ->',
+                                     '-> ' + cycle_start])),
+                              font_color='black')
+
       for i, module in enumerate(sorted(module_to_file.keys())):
         module_to_colour[module] = COLOURS[i]
 
-        # Draw the module nodes.
-        nx.draw_networkx_nodes(flow, pos,
-                               nodelist=[module + ' ->',
-                                         '-> ' + module],
-                               node_color=COLOURS[i],
-                               node_shape='s')
-
-        if ('-> ' + module, module + ' ->') in flow.edges:
-          colour = 'black' if module != cut_module else 'blue'
-          nx.draw_networkx_edges(flow, pos,
-                                 edgelist=[('-> ' + module,
-                                            module + ' ->')],
-                                 edge_color=colour)
-
-        nx.draw_networkx_labels(flow, pos,
-                                labels=dict(
-                                  map(lambda e:
-                                      (e, e.replace(' ->', '')
-                                           .replace('-> ', '')),
-                                      [module + ' ->',
-                                       '-> ' + module])),
-                                font_color='black')
-
-        # Draw the file nodes...
+        # Draw the file nodes belonging to the iterated module.
         dependees = list(filter(lambda e: e in flow.nodes,
                                 map(lambda s: s + ' ->',
                                     module_to_file[module])))
@@ -456,20 +467,30 @@ def get_modules_circular_dependency(module_map, dependency_map):
                                       (e, e.replace(' ->', '')
                                            .replace('-> ', '')),
                                       dependees + dependencies)),
-                                font_color='#444444')
+                                font_color='#666666')
 
-        # ... and link them to the modules.
-        for dep in dependees:
-          if (module + ' ->', dep) in flow.edges:
-            nx.draw_networkx_edges(flow, pos,
-                                   edgelist=[(module + ' ->', dep)],
-                                   edge_color='#bbbbbb')
+        if module == cycle_start:
+          # ... and link them to the module node (in case of cycle's two end)
+          for dep in dependees:
+            if (module + ' ->', dep) in flow.edges:
+              nx.draw_networkx_edges(flow, pos,
+                                     edgelist=[(module + ' ->', dep)],
+                                     edge_color='#bbbbbb')
 
-        for dep in dependencies:
-          if (dep, '-> ' + module) in flow.edges:
-            nx.draw_networkx_edges(flow, pos,
-                                   edgelist=[(dep, '-> ' + module)],
-                                   edge_color='#bbbbbb')
+          for dep in dependencies:
+            if (dep, '-> ' + module) in flow.edges:
+              nx.draw_networkx_edges(flow, pos,
+                                     edgelist=[(dep, '-> ' + module)],
+                                     edge_color='#bbbbbb')
+        else:
+          # Or link them to each other, if the file appears on both sides
+          # of the module.
+          for file_in_module in module_to_file[module]:
+            self_edge = ('-> ' + file_in_module, file_in_module + ' ->')
+            if self_edge in flow.edges:
+              nx.draw_networkx_edges(flow, pos,
+                                     edgelist=[self_edge],
+                                     edge_color='#222222')
 
       # Draw in the file dependencies.
       def _draw_edge(u, v):
