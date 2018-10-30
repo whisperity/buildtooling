@@ -75,14 +75,33 @@ class ModuleMapping():
       for f in v['fragments']:
         yield f
 
-  def get_modules_for_file(self, file):
+  def get_modules_for_fragment(self, fragment_file):
     """
-    Returns the list of modules where the given :param file: was mapped into.
+    Returns the list of modules where the given :param fragment_file: was
+    mapped into.
     """
     return map(itemgetter(0),  # Return the key, the module's name.
                filter(
-                 lambda i: file in i[1]['fragments'],
+                 lambda i: fragment_file in i[1]['fragments'],
                  self._map.items()))
+
+  def filter_modules_for_fragments(self, fragments):
+    """
+    :return: A dict which maps only the fragment files specified in
+    :param fragments: to modules they belong to.
+    """
+    ret = dict()
+
+    for fragment in fragments:
+      for module in self.get_modules_for_fragment(fragment):
+        file_list_for_module = ret.get(module, list())
+        if len(file_list_for_module) == 0:
+          # A new list was created, append it to the dict.
+          ret[module] = file_list_for_module
+
+        file_list_for_module.append(fragment)
+
+    return ret
 
   def add_module_import(self, module, dependency):
     if module not in self:
@@ -120,8 +139,9 @@ class DependencyMap():
     """
     Add the dependency that :param dependee: depends on :param dependency:.
     """
-    dependee_modules = self._module_mapping.get_modules_for_file(dependee)
-    dependency_modules = self._module_mapping.get_modules_for_file(dependency)
+    dependee_modules = self._module_mapping.get_modules_for_fragment(dependee)
+    dependency_modules = self._module_mapping.get_modules_for_fragment(
+      dependency)
 
     for mod in dependee_modules:
       if mod not in self._map:
@@ -272,35 +292,28 @@ def get_modules_circular_dependency(module_map, dependency_map):
 
       lst[i] = list(map(lambda s: s.strip(), d))
 
-  def _draw_dependency_graph(cycle_graph):
+  def _draw_dependency_graph(cycle_graph, module_to_file_map):
     """
     Helper function that creates a visualisation graph of the includes in the
     :param cycle_graph:.
     """
-    COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
-              '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
-              '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
-              '#000075', '#808080', '#ffffff', '#000000']
+    COLOURS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+               '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
+               '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
+               '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
 
     # To be able to colour individual files belonging to the same module with
     # the same colour, this map is needed.
-    module_to_file = {}
-    for filename in cycle_graph.nodes:
-      for module in module_map.get_modules_for_file(filename):
-        mtf_l = module_to_file.get(module, list())
-        if len(mtf_l) == 0:
-          module_to_file[module] = mtf_l
-        mtf_l.append(filename)
 
     pos = nx.nx_pydot.graphviz_layout(cycle_graph)
-    for idx, item in enumerate(module_to_file.items()):
+    for idx, item in enumerate(module_to_file_map.items()):
       module, files = item
       nx.draw_networkx_nodes(cycle_graph, pos,
                              nodelist=files,
-                             node_color=COLORS[idx])
+                             node_color=COLOURS[idx])
       nx.draw_networkx_edges(cycle_graph, pos,
                              edgelist=cycle_graph.out_edges(files),
-                             edge_color=COLORS[idx])
+                             edge_color=COLOURS[idx])
 
     nx.draw_networkx_labels(cycle_graph, pos)
     matplotlib.pyplot.axis('off')
@@ -349,6 +362,149 @@ def get_modules_circular_dependency(module_map, dependency_map):
         for file_in_B in files_in_B:
           tqdm.write("%s: %s" % (file_in_A, file_in_B))
           cycle_file_graph.add_edge(file_in_A, file_in_B)
+
+    # Map every file that spans the circular dependency to the module they
+    # belong to.
+    module_to_file = module_map.filter_modules_for_fragments(
+      cycle_file_graph.nodes)
+
+    # Create a flow graph that has a node for each module in the cycle,
+    # mapping the files belonging to a module with a directed edge, and also
+    # containing the dependency edges.
+    # If a file is dependent upon and also depends on others, it is added
+    # multiple times, once for the incoming, and once for the outgoing edges.
+    flow = nx.DiGraph()
+    for module in cycle[:-1]:  # Here only iterate the path, not the cycle.
+      flow.add_node(module + ' ->')
+      flow.add_node('-> ' + module)
+
+      for file_in_module in module_to_file[module]:
+        if cycle_file_graph.out_degree(file_in_module) > 0:
+          # file_in_module depends on other files.
+          flow.add_node(file_in_module + ' ->')
+          flow.add_edge(module + ' ->',
+                        file_in_module + ' ->')  # capacity: infinite
+        if cycle_file_graph.in_degree(file_in_module) > 0:
+          # file_in_module is a dependency of other files.
+          flow.add_node('-> ' + file_in_module)
+          flow.add_edge('-> ' + file_in_module,
+                        '-> ' + module)  # capacity: infinite
+
+      # Between each module there is a link (with infinite capacity) from
+      # dependency to dependee.
+      flow.add_edge('-> ' + module, module + ' ->')
+
+    # Add the actual dependency edges between the files.
+    for dependency_edge in cycle_file_graph.edges:
+      flow.add_edge(dependency_edge[0] + ' ->',
+                    '-> ' + dependency_edge[1],
+                    capacity=1)
+
+    def _visualise_flow_and_cut(idx, cut_module, partition):
+      """
+      Helper function to visualise the flow graph and mark the cut created by
+      :param partition:.
+      """
+      pos = nx.nx_pydot.graphviz_layout(flow)
+      matplotlib.pyplot.figure(idx)
+
+      COLOURS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+                 '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
+                 '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
+                 '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
+      module_to_colour = {}
+      for i, module in enumerate(sorted(module_to_file.keys())):
+        module_to_colour[module] = COLOURS[i]
+
+        # Draw the module nodes.
+        nx.draw_networkx_nodes(flow, pos,
+                               nodelist=[module + ' ->',
+                                         '-> ' + module],
+                               node_color=COLOURS[i],
+                               node_shape='s')
+
+        if ('-> ' + module, module + ' ->') in flow.edges:
+          colour = 'black' if module != cut_module else 'blue'
+          nx.draw_networkx_edges(flow, pos,
+                                 edgelist=[('-> ' + module,
+                                            module + ' ->')],
+                                 edge_color=colour)
+
+        nx.draw_networkx_labels(flow, pos,
+                                labels=dict(
+                                  map(lambda e:
+                                      (e, e.replace(' ->', '')
+                                           .replace('-> ', '')),
+                                      [module + ' ->',
+                                       '-> ' + module])),
+                                font_color='black')
+
+        # Draw the file nodes...
+        dependees = list(filter(lambda e: e in flow.nodes,
+                                map(lambda s: s + ' ->',
+                                    module_to_file[module])))
+        dependencies = list(filter(lambda e: e in flow.nodes,
+                                   map(lambda s: '-> ' + s,
+                                       module_to_file[module])))
+
+        nx.draw_networkx_nodes(flow, pos,
+                               nodelist=dependees + dependencies,
+                               node_color=COLOURS[i])
+        nx.draw_networkx_labels(flow, pos,
+                                labels=dict(
+                                  map(lambda e:
+                                      (e, e.replace(' ->', '')
+                                           .replace('-> ', '')),
+                                      dependees + dependencies)),
+                                font_color='#444444')
+
+        # ... and link them to the modules.
+        for dep in dependees:
+          if (module + ' ->', dep) in flow.edges:
+            nx.draw_networkx_edges(flow, pos,
+                                   edgelist=[(module + ' ->', dep)],
+                                   edge_color='#bbbbbb')
+
+        for dep in dependencies:
+          if (dep, '-> ' + module) in flow.edges:
+            nx.draw_networkx_edges(flow, pos,
+                                   edgelist=[(dep, '-> ' + module)],
+                                   edge_color='#bbbbbb')
+
+      # Draw in the file dependencies.
+      def _draw_edge(u, v):
+        # Show the cut's edges in a different style. A cutting edge is an
+        # edge which ends are in different partitions.
+        S, T = partition[0], partition[1]
+        if (u in S and v in T) or (u in T and v in S):
+          # colour = '#b33a3a'
+          colour = '#ffa500'
+          width = 4.0
+          style = 'dashdot'
+        else:
+          from_module = next(module_map.get_modules_for_fragment(
+            u.replace(' ->', '')), None)
+          colour = module_to_colour[from_module]
+          width = 1.0
+          style = 'solid'
+
+        nx.draw_networkx_edges(flow, pos,
+                               edgelist=[(u, v)],
+                               width=width,
+                               edge_color=colour,
+                               style=style)
+
+      for dependency_edge in cycle_file_graph.edges:
+        _draw_edge(dependency_edge[0] + ' ->', '-> ' + dependency_edge[1])
+
+      matplotlib.pyplot.axis('off')
+
+    # Calculate the minimal cut on the built flow-graph.
+    cut_value, partition = \
+      nx.minimum_cut(flow, cycle[0] + ' ->', '-> ' + cycle[0])
+
+    _visualise_flow_and_cut(i + 1, cycle[0], partition)
+    matplotlib.pyplot.show()
 
     if nx.is_weakly_connected(cycle_file_graph):
       print("Fatal error! The dependency graph for circular module "

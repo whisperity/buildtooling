@@ -42,7 +42,7 @@ def filter_imports_from_includes(filename,
   # First is good enough as the module map is expected to had been uniqued out
   # earlier.
   def __get_module(include):
-    return next(modulemap.get_modules_for_file(include), None)
+    return next(modulemap.get_modules_for_fragment(include), None)
 
   # Rearrange the include statements so all of them are on the top, and for
   # easier rewriting to "import", in alphabetical order.
