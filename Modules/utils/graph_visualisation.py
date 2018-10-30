@@ -67,14 +67,15 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
       else [module + ' ->', '-> ' + module]
     module_node_dict = dict(map(lambda e: (e, e), module_node_list))
 
-    nx.draw_networkx_nodes(flow, pos,
-                           nodelist=module_node_list,
-                           node_color=COLOURS[i],
-                           node_shape='s')
+    if all([module in flow.nodes for module in module_node_list]):
+      nx.draw_networkx_nodes(flow, pos,
+                             nodelist=module_node_list,
+                             node_color=COLOURS[i],
+                             node_shape='s')
 
-    nx.draw_networkx_labels(flow, pos,
-                            labels=module_node_dict,
-                            font_color=module_node_colour)
+      nx.draw_networkx_labels(flow, pos,
+                              labels=module_node_dict,
+                              font_color=module_node_colour)
 
     # Draw the file nodes belonging to the iterated module.
     dependees = list(filter(lambda e: e in flow.nodes,

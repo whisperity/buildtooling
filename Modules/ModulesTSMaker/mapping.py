@@ -339,6 +339,14 @@ def _create_flow_for_cycle_graph(cycle,
                           capacity=in_degree if any_file_on_both_sides
                           else float('inf'))
 
+    # If all files for the module had been added and every such file appeared
+    # "on both sides" (both as a dependency and one that depends on others),
+    # then the module's node is an isolated vertex... it's useless, remove it.
+    if nx.is_isolate(flow, dependee_node):
+      flow.remove_node(dependee_node)
+    if nx.is_isolate(flow, dependency_node):
+      flow.remove_node(dependency_node)
+
   # Add the actual dependency edges between the files.
   for dependency_edge in cycle_file_graph.edges:
     flow.add_edge(dependency_edge[0] + ' ->',
@@ -416,24 +424,26 @@ def get_modules_circular_dependency(module_map, dependency_map):
     module_to_files_map = module_map.filter_modules_for_fragments(
       cycle_file_graph.nodes)
 
-    if nx.is_weakly_connected(cycle_file_graph):
-      tqdm.write("Fatal error! The dependency graph for circular module "
-                 "dependency\n"
-                 "    %s\n"
-                 "is fully connected. Modules cannot be split."
-                 % ' -> '.join(cycle),
-                 file=sys.stderr)
-      tqdm.write("The dependencies that create the cycle is spanned by the "
-                 "following files:", file=sys.stderr)
-      tqdm.write(json.dumps(nx.to_dict_of_lists(cycle_file_graph), indent=2),
-                 file=sys.stderr)
-
-      # graph_visualisation.draw_dependency_graph(cycle_file_graph,
-      #                                           module_to_files_map)
-      # (Blocking call here.)
-      # plt.show()
-      # TODO: Record the fact that resolving the dependency is impossible!
-      continue
+    # QUESTION: It looks like this early "return" is not needed, as the
+    #           dependency cut thing seems to give valueable results here too.
+    # if nx.is_weakly_connected(cycle_file_graph):
+    #   tqdm.write("Fatal error! The dependency graph for circular module "
+    #              "dependency\n"
+    #              "    %s\n"
+    #              "is fully connected. Modules cannot be split."
+    #              % ' -> '.join(cycle),
+    #              file=sys.stderr)
+    #   tqdm.write("The dependencies that create the cycle is spanned by the "
+    #              "following files:", file=sys.stderr)
+    #   tqdm.write(json.dumps(nx.to_dict_of_lists(cycle_file_graph), indent=2),
+    #              file=sys.stderr)
+    #
+    #   # graph_visualisation.draw_dependency_graph(cycle_file_graph,
+    #   #                                           module_to_files_map)
+    #   # # (Blocking call here.)
+    #   # plt.show()
+    #   # TODO: Record the fact that resolving the dependency is impossible!
+    #   continue
 
     flow = _create_flow_for_cycle_graph(cycle, cycle_file_graph,
                                         module_to_files_map)
