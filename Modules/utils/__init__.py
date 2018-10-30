@@ -1,7 +1,7 @@
 import os
 from itertools import filterfalse, tee
 
-__all__ = ['progress_bar']
+__all__ = ['progress_bar', 'graph_visualisation']
 
 
 def partition(pred, iterable):
