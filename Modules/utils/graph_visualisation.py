@@ -8,6 +8,8 @@ except ImportError as e:
         "system, or preferably create a virtualenv.")
   raise
 
+from .graph import is_cutting_edge
+
 
 COLOURS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
            '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
@@ -55,6 +57,34 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
   flow graph.
   """
   pos = nx.nx_pydot.graphviz_layout(flow)
+  capacities = dict(map(lambda e: ((e[0], e[1]), e[2]),
+                        flow.edges(data='capacity')))
+
+  def _draw_edge_from_names(name_collection, edge_endpoint_lambda,
+                            colour_lambda, draw_capacity=False):
+    """
+    Helper function that draws all edges created by applying
+    :param edge_endpoint_lambda: on the names in :param name_collection:.
+    The created edge will be draw only if it is part of the :var flow: graph.
+
+    :param colour_lambda: A lambda that is called with the generated edge
+    tuple and decides what colour the edge will be drawn as.
+    :param draw_capacity: If set to True, the the capacity of the edge
+    will also be rendered.
+    """
+    for name in name_collection:
+      edge = edge_endpoint_lambda(name)
+      if edge in flow.edges:
+        colour = colour_lambda(edge)
+        nx.draw_networkx_edges(flow, pos,
+                               edgelist=[edge],
+                               edge_color=colour)
+
+        if draw_capacity:
+          capacity = capacities.get(edge, None)
+          if capacity is not None and capacity != float('inf'):
+            nx.draw_networkx_edge_labels(flow, pos,
+                                         edge_labels={edge: capacity})
 
   module_to_colour = {}
   for i, module in enumerate(sorted(module_to_files_map.keys())):
@@ -97,49 +127,40 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
                             font_color='#666666')
 
     # ... and link them to the module node ...
-    for dep in dependees:
-      edge_try = (module + ' ->', dep)
-      if edge_try in flow.edges:
-        nx.draw_networkx_edges(flow, pos,
-                               edgelist=[edge_try],
-                               edge_color='#dddddd')
-      else:
-        edge_try = ('-> ' + module + ' ->', dep)
-        if edge_try in flow.edges:
-          nx.draw_networkx_edges(flow, pos,
-                                 edgelist=[edge_try],
-                                 edge_color='#dddddd')
+    def dep_and_file_colour(edge):
+      return '#ffa500' if is_cutting_edge(edge, cut_partition) else '#dddddd'
 
-    for dep in dependencies:
-      edge_try = (dep, '-> ' + module)
-      if edge_try in flow.edges:
-        nx.draw_networkx_edges(flow, pos,
-                               edgelist=[edge_try],
-                               edge_color='#dddddd')
-      else:
-        edge_try = (dep, '-> ' + module + ' ->')
-        if edge_try in flow.edges:
-          nx.draw_networkx_edges(flow, pos,
-                                 edgelist=[edge_try],
-                                 edge_color='#dddddd')
+    _draw_edge_from_names(dependees,
+                          lambda dependee: (module + ' ->', dependee),
+                          dep_and_file_colour, True)
+    _draw_edge_from_names(dependees,
+                          lambda dependee: ('-> ' + module + ' ->', dependee),
+                          dep_and_file_colour, True)
+
+    _draw_edge_from_names(dependencies,
+                          lambda dependency: (dependency, '-> ' + module),
+                          dep_and_file_colour, True)
+    _draw_edge_from_names(dependencies,
+                          lambda dependency: (dependency,
+                                              '-> ' + module + ' ->'),
+                          dep_and_file_colour, True)
 
     # ... and for files that appear on both sides of a module, link them
     # to each other too.
-    for file_in_module in module_to_files_map[module]:
-      self_edge = ('-> ' + file_in_module, file_in_module + ' ->')
-      if self_edge in flow.edges:
-        nx.draw_networkx_edges(flow, pos,
-                               edgelist=[self_edge],
-                               edge_color='#666666')
+    _draw_edge_from_names(module_to_files_map[module],
+                          lambda file_in_module: ('-> ' + file_in_module,
+                                                  file_in_module + ' ->'),
+                          lambda edge: '#ffa500' if
+                              is_cutting_edge(edge, cut_partition)
+                            else '#666666')
 
-  # Draw in the file dependencies.
+  # Draw in the dependencies between distinct files from the original
+  # dependency graph.
   for dependency_edge in cycle_graph.edges:
     u, v = dependency_edge[0] + ' ->', '-> ' + dependency_edge[1]
     # Show the cut's edges in a different style. A cutting edge is an
     # edge which ends are in different partitions.
-    S, T = cut_partition[0], cut_partition[1]
-    if (u in S and v in T) or (u in T and v in S):
-      # colour = '#b33a3a'
+    if is_cutting_edge((u, v), cut_partition):
       colour = '#ffa500'
       width = 4.0
       style = 'dashdot'
