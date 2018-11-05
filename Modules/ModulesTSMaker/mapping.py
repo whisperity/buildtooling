@@ -1,10 +1,12 @@
 import codecs
+import copy
 import itertools
 import json
 import os
 import re
 import sys
 from collections import Counter
+from hashlib import md5
 from operator import itemgetter
 
 try:
@@ -18,6 +20,7 @@ except ImportError as e:
 
 from utils import strip_folder, walk_folder, graph_visualisation
 from utils.progress_bar import tqdm
+from utils.graph import is_cutting_edge, generate_cutting_edges
 from . import include
 from . import util
 
@@ -54,6 +57,15 @@ class ModuleMapping():
                      "added.")
 
     self._map[module]['fragments'].append(fragment_file)
+
+  def remove_fragment(self, fragment_file):
+    """
+    Unmaps the given :param fragment_file: from all modules it is mapped to.
+    """
+    for module in self.filter_modules_for_fragments([fragment_file]):
+      self._map[module]['fragments'].remove(fragment_file)
+
+    # TODO: Handle querying of "emptied" modules and removal of their files.
 
   def get_filename(self, module):
     if module not in self:
@@ -154,6 +166,53 @@ class DependencyMap():
           self._map[mod][dependee][dep] = []
         if dependency not in self._map[mod][dependee][dep]:
           self._map[mod][dependee][dep].append(dependency)
+
+  def remove_file(self, filename):
+    """
+    Removes the given :param filename: from the dependency map. Every
+    depedency incident to the file is removed.
+    """
+    modules = self._module_mapping.get_modules_for_fragment(filename)
+
+    for mod in modules:
+      if mod not in self._map:
+        continue
+
+      for dep in modules:
+        if dep not in self._map[mod][filename]:
+          continue
+
+        if filename in self._map[mod][filename][dep]:
+          self._map[mod][filename][dep].remove(filename)
+
+        if len(self._map[mod][filename][dep]) == 0:
+          del self._map[mod][filename][dep]
+
+      if len(self._map[mod][filename]) == 0:
+        del self._map[mod][filename]
+
+      if len(self._map[mod]) == 0:
+        del self._map[mod]
+
+  def get_dependencies(self, filename):
+    """
+    :return: A list of files :param filename: depends on, across every module.
+    """
+    ret = list()
+    modules = self._module_mapping.get_modules_for_fragment(filename)
+
+    for mod in modules:
+      if mod not in self._map:
+        continue
+
+      for dep in modules:
+        if dep not in self._map[mod][filename]:
+          continue
+
+        if filename in self._map[mod][filename][dep]:
+          ret.extend(self._map[mod][filename][dep])
+
+    return ret
 
   def get_files_creating_dependency_between(self, from_module, to_module):
     """
@@ -356,8 +415,49 @@ def _create_flow_for_cycle_graph(cycle,
   return flow
 
 
-def get_modules_circular_dependency(module_map, dependency_map):
+def _get_new_module_name(module_map, moved_files):
   """
+  Given a :param module_map: this function generated a name for files in
+  :param moved_files:. The new module name will be something that does not
+  exist in the module map already.
+  """
+  if len(moved_files) == 0:
+    raise ValueError("The 'moved_files' list must contain at least one file.")
+
+  digest = md5(','.join(moved_files).encode('utf-8')).hexdigest()
+  digest_sublen = 7
+  new_name = "Module__autogen_%s" % digest[:digest_sublen]
+  while new_name in module_map:
+    digest_sublen += 1
+    new_name = "Module__autogen_%s" % digest[:digest_sublen]
+
+  return new_name
+
+
+def apply_file_moves(module_map, dependency_map, moved_files):
+  """
+  Creates a NEW :param ModuleMapping: and :type DependencyMap: by applying the
+  file moving to other module changes dictated by :param moved_files:
+  :return: A pair of the new maps.
+  """
+  new_module_map = copy.deepcopy(module_map)
+
+  for filename, new_module in moved_files.items():
+    print("Moving", filename, "to", new_module, "...")
+
+  new_dependency_map = DependencyMap(new_module_map)
+
+  return None, None
+
+
+def get_circular_dependency_resolution(module_map, dependency_map):
+  """
+  Checks if the given :param module_map: and :param dependency_map: (which is
+  created bound to the :param module_map:) contain circular dependencies on
+  the module "folder" level.
+
+  :return: A map of files to new module names to be moved to resolve the
+  dependency. The map is empty if no cycles were found.
   """
 
   def _map_to_dependencies(module):
@@ -369,6 +469,8 @@ def get_modules_circular_dependency(module_map, dependency_map):
             # Return the dependencies as a list, sorted, as opposed to a set,
             # so the order is deterministic.
             list(sorted(module_map.get_dependencies_of_module(module))))
+
+  file_to_new_module = dict()
 
   dependencies = dict(map(_map_to_dependencies, module_map))
   graph = nx.DiGraph(dependencies)
@@ -451,17 +553,54 @@ def get_modules_circular_dependency(module_map, dependency_map):
     cut_value, partition = nx.minimum_cut(flow,
                                           cycle[0] + ' ->', '-> ' + cycle[0])
 
-    tqdm.write("A cut of value %d, with the partitions:" % cut_value)
-    tqdm.write(json.dumps((list(partition[0]), list(partition[1])),
-                          indent=2))
-
-    graph_visualisation.draw_flow_and_cut(flow, cycle_file_graph,
-                                          module_to_files_map, cycle[0],
-                                          partition)
+    # plt.figure(i + 1)
+    # plt.gcf().canvas.set_window_title(' -> '.join(cycle))
+    # plt.title(' -> '.join(cycle))
+    # graph_visualisation.draw_flow_and_cut(flow, cycle_file_graph,
+    #                                       module_to_files_map, cycle[0],
+    #                                       partition)
     # (Blocking call here!)
-    plt.show()
+    # plt.show()
 
-  return False
+    # Create edges from the file dependency graph in which the edge endpoints
+    # show the "direction" of the edge. (Partition contains edges between
+    # nodes named as such.)
+    cycle_file_graph_edges_namedirected = map(lambda e: (e[0] + ' ->',
+                                                         '-> ' + e[1]),
+                                              cycle_file_graph.edges)
+
+    cutting_edges = list(
+      generate_cutting_edges(cycle_file_graph_edges_namedirected, partition))
+
+    # Create the list of files which are part of the partitioning.
+    # partition_files = list(filter(
+    #   lambda f: f in cycle_file_graph.nodes,
+    #   map(lambda s: s.replace('-> ', '').replace(' ->', ''),
+    #       partition[0] | partition[1])))
+    # plt.figure(i + 1)
+    # plt.gcf().canvas.set_window_title(' -> '.join(cycle))
+    # plt.title(' -> '.join(cycle))
+    #
+    # pos = nx.nx_pydot.graphviz_layout(cycle_file_graph)
+    # nx.draw_networkx_nodes(cycle_file_graph, pos, partition_files)
+    # nx.draw_networkx_labels(cycle_file_graph, pos)
+    # for e in cutting_edges:
+    #   e = (e[0].replace('-> ', '').replace(' ->', ''),
+    #        e[1].replace('-> ', '').replace(' ->', ''))
+    #   nx.draw_networkx_edges(cycle_file_graph, pos, edgelist=[e])
+    #
+    # plt.show()
+
+    files_to_move = set(map(lambda e:
+                            e[1].replace('-> ', '').replace(' ->', ''),
+                            cutting_edges))
+    new_module_name = _get_new_module_name(module_map, files_to_move)
+    for filename in files_to_move:
+      if filename in file_to_new_module:
+        continue
+      file_to_new_module[filename] = new_module_name
+
+  return file_to_new_module
 
 
 def write_topological_order(module_file,

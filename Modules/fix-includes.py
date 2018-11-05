@@ -49,11 +49,38 @@ for file in tqdm(headers,
 
 print("\n")
 
-# Check if the modules involve a circular
-if not mapping.get_modules_circular_dependency(MODULEMAP, DEPENDENCY_MAP):
+# Check if the read module map contains circular dependencies that make the
+# current module map infeasible, and try to resolve it.
+# It is to be noted that this algorithm is finite, as worst case the system
+# will fall apart to N distinct modules where N is the number of translation
+# units -- unfortunately there was no improvement on modularisation made in
+# this case...
+all_files_to_move = dict()
+module_map_infeasible = True
+while module_map_infeasible:
+  files_to_move = mapping.get_circular_dependency_resolution(MODULEMAP,
+                                                             DEPENDENCY_MAP)
+  if len(files_to_move) == 0:
+    # If the resolution of the cycles is to do nothing, there are no issues
+    # with the mapping anymore
+    module_map_infeasible = False
+    break
+
+  all_files_to_move.update(files_to_move)
+
+  import json
+  print(json.dumps(files_to_move, indent=2, sort_keys=True))
   print("Error: Modules contain circular dependencies on each other.",
         file=sys.stderr)
+
+  MODULEMAP, DEPENDENCY_MAP = mapping.apply_file_moves(MODULEMAP,
+                                                       DEPENDENCY_MAP,
+                                                       files_to_move)
+
   sys.exit(1)
+
+
+# TODO: Actually move the files in "all_files_to_move".
 
 # Files can transitively and with the employment of header guards,
 # recursively include each other, which is not a problem in normal C++,
