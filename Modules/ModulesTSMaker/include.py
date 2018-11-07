@@ -25,9 +25,6 @@ def filter_imports_from_includes(filename,
   code which does not contain '#include' statements to files that are mapped
   to any module. (Includes that are not mapped to any module remain.)
 
-  :param modulemap: The modulemap is extended with the list of modules the
-  module should depend on after the includes are filtered.
-
   :param dependency_map: The function's call builds the dependency map, which
   specifies that what files belonging to a module depend on what files
   belonging to other modules.
@@ -54,7 +51,6 @@ def filter_imports_from_includes(filename,
     # If the file contains no "#include" statements, no need to do anything.
     return
 
-  self_module = __get_module(filename)
   lines_to_keep = []
   for line in tqdm(include_lines,
                    unit='directives',
@@ -80,7 +76,5 @@ def filter_imports_from_includes(filename,
         continue
 
     dependency_map.add_dependency(filename, included)
-    if module != self_module and self_module is not None:
-      modulemap.add_module_import(self_module, module)
 
   return ''.join(other_lines)

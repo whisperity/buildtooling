@@ -62,10 +62,17 @@ class ModuleMapping():
     """
     Unmaps the given :param fragment_file: from all modules it is mapped to.
     """
+    modules_gone_empty = list()
     for module in self.filter_modules_for_fragments([fragment_file]):
       self._map[module]['fragments'].remove(fragment_file)
+      if not self._map[module]['fragments']:
+        modules_gone_empty.append(module)
 
-    # TODO: Handle querying of "emptied" modules and removal of their files.
+    for module in modules_gone_empty:
+      # TODO: Allow client code to obtain this deletion information so
+      # physical files can be cleaned up.
+      # del self._map[module]
+      pass
 
   def get_filename(self, module):
     if module not in self:
@@ -126,9 +133,15 @@ class ModuleMapping():
 
   def get_dependencies_of_module(self, module):
     if module not in self:
-      raise KeyError("Cannot get fragments for a module that has not been "
+      raise KeyError("Cannot get dependencies for a module that has not been "
                      "added.")
     return self._map[module]['imported-modules']
+
+  def clear_module_imports(self, module):
+    if module not in self:
+      raise KeyError("Cannot clear dependencies for a module that has not "
+                     "been added.")
+    self._map[module]['imported-modules'] = set()
 
 
 class DependencyMap():
@@ -172,45 +185,86 @@ class DependencyMap():
     Removes the given :param filename: from the dependency map. Every
     depedency incident to the file is removed.
     """
-    modules = self._module_mapping.get_modules_for_fragment(filename)
+    modules_to_remove = list()
 
-    for mod in modules:
-      if mod not in self._map:
+    for module in self._map:
+      if filename in self._map[module]:
+        # Found a module which contains 'filename', and dependency information
+        # of it. File is deleted, so remove the entire inner dict.
+        # print("FOUND FILE TO REMOVE IN A MODULE", filename)
+        del self._map[module][filename]
+        if not self._map[module]:
+          # The module has emptied out.
+          modules_to_remove.append(module)
         continue
 
-      for dep in modules:
-        if dep not in self._map[mod][filename]:
-          continue
+      # print("MODULE", module)
+      files_to_remove_from_module = list()
+      for file_in_module in self._map[module]:
+        # print("FILE IN MODULE", module, file_in_module)
+        inner_modules_to_remove = list()
+        for dep_module, dep_filelist in \
+            self._map[module][file_in_module].items():
+          if filename in dep_filelist:
+            # Remove the file from every file's dependency list, if found.
+            # print("FOUND FILE TO REMOVE AS DEPENDENCY", filename)
+            dep_filelist.remove(filename)
+            if not dep_filelist:
+              # The dependency list of module 'dep_module' for
+              # 'file_in_module' has emptied out, remove this entry.
+              inner_modules_to_remove.append(dep_module)
 
-        if filename in self._map[mod][filename][dep]:
-          self._map[mod][filename][dep].remove(filename)
+        for remove_module in inner_modules_to_remove:
+          # Clear module-level dependency if now in fact the file does not
+          # depend on said module anymore.
+          # print("MODULE", remove_module, "AS DEPENDENCY EMPTIED")
+          del self._map[module][file_in_module][remove_module]
 
-        if len(self._map[mod][filename][dep]) == 0:
-          del self._map[mod][filename][dep]
+        if not self._map[module][file_in_module]:
+          # print("DEPENDENCY LIST OF", module, file_in_module, "EMPTIED.")
+          files_to_remove_from_module.append(file_in_module)
 
-      if len(self._map[mod][filename]) == 0:
-        del self._map[mod][filename]
+      for remove_from_module in files_to_remove_from_module:
+        # print("DEPENDENCY LIST OF", remove_from_module, "EMPTY... DELETING "
+        #       "FILE")
+        del self._map[module][remove_from_module]
 
-      if len(self._map[mod]) == 0:
-        del self._map[mod]
+    for remove_module in modules_to_remove:
+      # print("MODULE", remove_module, "NO LONGER CONTAINS ANY FILES THAT "
+      #       "DEPEND... REMOVING.")
+      del self._map[remove_module]
 
   def get_dependencies(self, filename):
     """
-    :return: A list of files :param filename: depends on, across every module.
+    :return: A collection of files :param filename: depends on, across every
+    module.
     """
-    ret = list()
+    ret = set()
     modules = self._module_mapping.get_modules_for_fragment(filename)
 
     for mod in modules:
       if mod not in self._map:
         continue
+      if filename not in self._map[mod]:
+        continue
 
-      for dep in modules:
-        if dep not in self._map[mod][filename]:
-          continue
+      for dependency_module in self._map[mod][filename]:
+        ret.update(set(self._map[mod][filename][dependency_module]))
 
-        if filename in self._map[mod][filename][dep]:
-          ret.extend(self._map[mod][filename][dep])
+    return ret
+
+  def get_dependees(self, filename):
+    """
+    :return: A collection of files depending on :param filename:, across every
+    module.
+    """
+    ret = set()
+
+    for mod in self._map:
+      for dependee_file in self._map[mod]:
+        for dependee_module in self._map[mod][dependee_file]:
+          if filename in self._map[mod][dependee_file][dependee_module]:
+            ret.add(dependee_file)
 
     return ret
 
@@ -241,6 +295,23 @@ class DependencyMap():
     mapping.
     """
     return self.get_files_creating_dependency_between(module, module)
+
+  def synthesize_intermodule_imports(self):
+    """
+    Using the dependencies stored in the current instance, synthesize a
+    module-module 'import' list into the :var _module_mapping: of the instance.
+    """
+    for module in self._module_mapping:
+      self._module_mapping.clear_module_imports(module)
+
+    for module in self._map:
+      module_dependencies = set()
+      for file_entry in self._map[module].values():
+        module_dependencies.update(file_entry.keys())
+      module_dependencies.discard(module)
+
+      for dependency in module_dependencies:
+        self._module_mapping.add_module_import(module, dependency)
 
 
 def get_module_mapping(srcdir):
@@ -398,13 +469,15 @@ def _create_flow_for_cycle_graph(cycle,
                           capacity=in_degree if any_file_on_both_sides
                           else float('inf'))
 
-    # If all files for the module had been added and every such file appeared
-    # "on both sides" (both as a dependency and one that depends on others),
-    # then the module's node is an isolated vertex... it's useless, remove it.
-    if nx.is_isolate(flow, dependee_node):
-      flow.remove_node(dependee_node)
-    if nx.is_isolate(flow, dependency_node):
-      flow.remove_node(dependency_node)
+    if module != cycle[0]:
+      # If all files for a module had been added and every such file appeared
+      # "on both sides" (both as a dependency and one that depends on others),
+      # then the module's node is an isolated vertex... it's useless, remove
+      # it.
+      if nx.is_isolate(flow, dependee_node):
+        flow.remove_node(dependee_node)
+      if nx.is_isolate(flow, dependency_node):
+        flow.remove_node(dependency_node)
 
   # Add the actual dependency edges between the files.
   for dependency_edge in cycle_file_graph.edges:
@@ -436,18 +509,34 @@ def _get_new_module_name(module_map, moved_files):
 
 def apply_file_moves(module_map, dependency_map, moved_files):
   """
-  Creates a NEW :param ModuleMapping: and :type DependencyMap: by applying the
-  file moving to other module changes dictated by :param moved_files:
-  :return: A pair of the new maps.
+  Update :param ModuleMapping: and :type DependencyMap: by applying the file
+  moving to other module changes dictated by :param moved_files:.
   """
-  new_module_map = copy.deepcopy(module_map)
+  if not moved_files:
+    return
+
+  dependencies_to_fix_up = list()
+  for filename in moved_files:
+    for file_depending_on_moved in dependency_map.get_dependees(filename):
+      dependencies_to_fix_up.append((file_depending_on_moved, filename))
+    for moved_depending_on_file in dependency_map.get_dependencies(filename):
+      dependencies_to_fix_up.append((filename, moved_depending_on_file))
+
+    dependency_map.remove_file(filename)
 
   for filename, new_module in moved_files.items():
-    print("Moving", filename, "to", new_module, "...")
+    module_map.remove_fragment(filename)
+    if new_module not in module_map:
+      module_map.add_module(new_module, os.devnull)
+    module_map.add_fragment(new_module, filename)
 
-  new_dependency_map = DependencyMap(new_module_map)
+  for dependee, dependency in dependencies_to_fix_up:
+    # Fix the dependency map so the file->file dependencies now point through
+    # the new module names.
+    dependency_map.add_dependency(dependee, dependency)
 
-  return None, None
+  # Resynthesize the import list because file-module relations have changed.
+  dependency_map.synthesize_intermodule_imports()
 
 
 def get_circular_dependency_resolution(module_map, dependency_map):
@@ -559,7 +648,7 @@ def get_circular_dependency_resolution(module_map, dependency_map):
     # graph_visualisation.draw_flow_and_cut(flow, cycle_file_graph,
     #                                       module_to_files_map, cycle[0],
     #                                       partition)
-    # (Blocking call here!)
+    # # (Blocking call here!)
     # plt.show()
 
     # Create edges from the file dependency graph in which the edge endpoints
@@ -594,11 +683,12 @@ def get_circular_dependency_resolution(module_map, dependency_map):
     files_to_move = set(map(lambda e:
                             e[1].replace('-> ', '').replace(' ->', ''),
                             cutting_edges))
-    new_module_name = _get_new_module_name(module_map, files_to_move)
-    for filename in files_to_move:
-      if filename in file_to_new_module:
-        continue
-      file_to_new_module[filename] = new_module_name
+    if files_to_move:
+      new_module_name = _get_new_module_name(module_map, files_to_move)
+      for filename in files_to_move:
+        if filename in file_to_new_module:
+          continue
+        file_to_new_module[filename] = new_module_name
 
   return file_to_new_module
 
