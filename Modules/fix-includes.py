@@ -7,6 +7,7 @@ Return codes:
 """
 
 import codecs
+import multiprocessing
 import os
 import re
 import sys
@@ -76,29 +77,29 @@ module_map_infeasible = True
 
 # TODO: There is some nondeterminism here, sometimes we exhaust the hash length
 iteration_count = 0
-while module_map_infeasible:
-  iteration_count += 1
-  print("==========->> Begin iteration %d trying to break cycles <<-=========="
-        % iteration_count)
+with multiprocessing.Pool() as pool:
+  while module_map_infeasible:
+    iteration_count += 1
+    print("=========->> Begin iteration %d trying to break cycles <<-========="
+          % iteration_count)
 
-  files_to_move = cycle_resolution.get_circular_dependency_resolution(
-    MODULEMAP, DEPENDENCY_MAP)
+    files_to_move = cycle_resolution.get_circular_dependency_resolution(
+      pool, MODULEMAP, DEPENDENCY_MAP)
 
-  if files_to_move is False:
-    print("Error! The modules contain circular dependencies on each other "
-          "which cannot be resolved automatically by splitting them.",
-          file=sys.stderr)
-    sys.exit(1)
-  elif files_to_move is True:
-    # If the resolution of the cycles is to do nothing, there are no issues
-    # with the mapping anymore.
-    module_map_infeasible = False
-    break
-
-  # Alter the module map with the calculated moves, and try running the
-  # iteration again.
-  mapping.apply_file_moves(MODULEMAP, DEPENDENCY_MAP, files_to_move)
-  all_files_to_move.update(files_to_move)
+    if files_to_move is False:
+      print("Error! The modules contain circular dependencies on each other "
+            "which cannot be resolved automatically by splitting them.",
+            file=sys.stderr)
+      sys.exit(1)
+    elif files_to_move is True:
+      # If the resolution of the cycles is to do nothing, there are no issues
+      # with the mapping anymore.
+      module_map_infeasible = False
+    else:
+      # Alter the module map with the calculated moves, and try running the
+      # iteration again.
+      mapping.apply_file_moves(MODULEMAP, DEPENDENCY_MAP, files_to_move)
+      all_files_to_move.update(files_to_move)
 
 print("Module cycles broken up successfully.")
 sys.exit(0)

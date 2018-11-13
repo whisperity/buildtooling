@@ -13,7 +13,6 @@ except ImportError as e:
 
 from utils import graph
 from utils.graph import generate_cutting_edges
-from utils.progress_bar import tqdm
 from . import util
 
 
@@ -145,9 +144,9 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   # broken, as another iteration of the algorithm will find a B -> ... -> B
   # cycle. In case of these files, it is more beneficial to move the
   # dependee instead.
-  for file in list(sorted(files_to_move)):
+  for file in sorted(files_to_move):
     # Iterate copy of the initial files, the dict is modified in the iteration.
-    tqdm.write(" ? File candidate for moving: %s" % file)
+    print(" ? File candidate for moving: %s" % file)
     if file + ' ->' in flow_graph.nodes and '-> ' + file in flow_graph.nodes:
       # Move the files that are the starting points of edges leading into the
       # previously marked files.
@@ -159,7 +158,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
         paths = []
 
       del files_to_move[file]
-      tqdm.write(" ! File cannot be moved: %s" % file)
+      print(" ! File cannot be moved: %s" % file)
       cut_candidates = deque(sorted(set(map(
         lambda e: e[0].replace('-> ', '').replace(' ->', ''),
         filter(lambda e: file in e[1], cutting_edges)))))
@@ -167,7 +166,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
       # Iterate as long as we have other termini of cutting.
       while cut_candidates:
         new_move_candidate = cut_candidates.popleft()
-        tqdm.write(" ? File candidate for moving: %s" % new_move_candidate)
+        print(" ? File candidate for moving: %s" % new_move_candidate)
         files_to_move[new_move_candidate] = None
 
         if '-> ' + new_move_candidate in flow_graph.nodes and \
@@ -202,7 +201,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
             # The move candidate is part of a path between the insolvent
             # dependency. Try to see if other nodes in the path could be
             # moved...
-            tqdm.write(" ! File cannot be moved: %s" % new_move_candidate)
+            print(" ! File cannot be moved: %s" % new_move_candidate)
             del files_to_move[new_move_candidate]
 
             def _handle_direction(generator):
@@ -249,8 +248,8 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   for file in files_moving_without_new_module_name:
     files_to_move[file] = new_module_name
 
-  tqdm.write("Will move the following files to fix the cycle:")
-  tqdm.write("    %s" % '\n    '.join(sorted(files_to_move)))
+  print("Will move the following files to fix the cycle:")
+  print("    %s" % '\n    '.join(sorted(files_to_move)))
 
   return files_to_move
 
@@ -276,11 +275,84 @@ def _get_new_module_name(module_map, moved_files):
   return new_name
 
 
-def get_circular_dependency_resolution(module_map, dependency_map):
+def _parallel(cycle, module_map, dependency_map):
+  """
+  The parallel worker part of :func get_circular_dependency_resolution:.
+  """
+
+  # Make sure it is "actually" a cycle.
+  cycle.append(cycle[0])
+
+  print("-------------------------------------------------------------")
+  print("Circular dependency between modules found on the following path:\n"
+        "    %s" % ' -> '.join(cycle))
+
+  # Create a graph that contains the files that span the dependencies that
+  # resulted in the cycle.
+  cycle_file_graph = nx.DiGraph()
+  for module_A, module_B in itertools.zip_longest(cycle[:-1], cycle[1:]):
+    # (E.g. iterates A -> B, B -> C, C -> A)
+
+    print("Between modules %s -> %s, the following files include each "
+          "other:" % (module_A, module_B))
+    files = dependency_map.get_files_creating_dependency_between(module_A,
+                                                                 module_B)
+    for file_in_A, files_in_B in sorted(files.items()):
+      files[file_in_A] = sorted(files_in_B)
+      print("    %s:" % file_in_A)
+      print("        %s" % '\n        '.join(files[file_in_A]))
+      cycle_file_graph.add_edges_from(zip(
+        itertools.repeat(file_in_A),
+        files[file_in_A]))
+
+  # Map every file that spans the circular dependency to the module they
+  # belong to.
+  module_to_files_map = module_map.filter_modules_for_fragments(
+    cycle_file_graph.nodes)
+
+  flow = _create_flow_for_cycle_graph(cycle, cycle_file_graph,
+                                      module_to_files_map)
+
+  # Calculate the minimal cut on the built flow-graph.
+  cut_value, partition = nx.minimum_cut(flow,
+                                        cycle[0] + ' ->',
+                                        '-> ' + cycle[0])
+
+  # Create edges from the file dependency graph in which the edge
+  # endpoints show the "direction" of the edge. (Partition contains edges
+  # between nodes named as such.)
+  cycle_file_graph_edges_namedirected = map(lambda e: (e[0] + ' ->',
+                                                       '-> ' + e[1]),
+                                            cycle_file_graph.edges)
+  cycle_file_graph_edges_namedirected = filter(
+    lambda e: e in flow.edges, cycle_file_graph_edges_namedirected)
+
+  cutting_edges = list(
+    generate_cutting_edges(cycle_file_graph_edges_namedirected, partition))
+
+  # Try fetching the list of files to move based on the cut.
+  files_to_move = _files_from_cutting_edges(module_map,
+                                            flow,
+                                            cutting_edges)
+
+  if not files_to_move:
+    # If files_to_move is a falsy value, like empty set, the cycle is
+    # deemed infeasible to solve.
+    return False
+  else:
+    # Return the list of files to be cut for merging to the pool handler.
+    return files_to_move
+
+
+def get_circular_dependency_resolution(pool, module_map, dependency_map):
   """
   Checks if the given :param module_map: and :param dependency_map: (which is
   created bound to the :param module_map:) contain circular dependencies on
   the module "folder" level.
+
+  :param pool: A :type multiprocessing.Pool: on which the cycle resolution
+  should be executed. Individual cycles can be resolved in an parallel manner,
+  as resolution is only calculated, and not applied to the shared resources.
 
   :return: A map of files to new module names to be moved to resolve the
   dependency. The map is empty if no cycles were found.
@@ -294,18 +366,16 @@ def get_circular_dependency_resolution(module_map, dependency_map):
     return (module,
             # Return the dependencies as a list, sorted, as opposed to a set,
             # so the order is deterministic.
-            list(sorted(module_map.get_dependencies_of_module(module))))
-
-  file_to_new_module = dict()
+            sorted(module_map.get_dependencies_of_module(module)))
 
   dependencies = dict(map(_map_to_dependencies, module_map))
   graph = nx.DiGraph(dependencies)
-  if nx.is_directed_acyclic_graph(graph):
+  cycles = list(nx.simple_cycles(graph))
+  if not cycles:
     # If the dependency graph no longer contains any cycles, there is nothing
     # to resolve.
     return True
 
-  cycles = list(nx.simple_cycles(graph))
   smallest_cycles_length = min([len(c) for c in cycles])
   smallest_cycles = list(
     filter(lambda l: len(l) == smallest_cycles_length, cycles))
@@ -322,75 +392,14 @@ def get_circular_dependency_resolution(module_map, dependency_map):
   print("Found %d smallest cycles of length %d between modules."
         % (len(smallest_cycles), smallest_cycles_length))
 
-  for i, cycle in tqdm(enumerate(smallest_cycles),
-                       desc="Breaking cycles...",
-                       total=len(smallest_cycles),
-                       unit='cycle'):
-    # Make sure it is "actually" a cycle.
-    cycle.append(cycle[0])
+  args = zip(smallest_cycles,
+             itertools.repeat(module_map),
+             itertools.repeat(dependency_map))
 
-    tqdm.write("-------------------------------------------------------------")
-    tqdm.write("Circular dependency between modules found on the following "
-               "path:\n"
-               "    %s" % ' -> '.join(cycle))
+  ret = dict()
+  for result in pool.starmap(_parallel, args):
+    if result is False:
+      return False
+    ret.update(result)
 
-    # Create a graph that contains the files that span the dependencies that
-    # resulted in the cycle.
-    cycle_file_graph = nx.DiGraph()
-    for module_A, module_B in itertools.zip_longest(cycle[:-1], cycle[1:]):
-      # (E.g. iterates A -> B, B -> C, C -> A)
-
-      tqdm.write("Between modules %s -> %s, the following files include each "
-                 "other:" % (module_A, module_B))
-      files = dependency_map.get_files_creating_dependency_between(module_A,
-                                                                   module_B)
-      for file_in_A, files_in_B in sorted(files.items()):
-        files[file_in_A] = list(sorted(files_in_B))
-        tqdm.write("    %s:" % file_in_A)
-        tqdm.write("        %s" % '\n        '.join(files[file_in_A]))
-        cycle_file_graph.add_edges_from(zip(
-          itertools.repeat(file_in_A),
-          files[file_in_A]))
-
-    # Map every file that spans the circular dependency to the module they
-    # belong to.
-    module_to_files_map = module_map.filter_modules_for_fragments(
-      cycle_file_graph.nodes)
-
-    flow = _create_flow_for_cycle_graph(cycle, cycle_file_graph,
-                                        module_to_files_map)
-    cut_settled = False
-    while not cut_settled:
-      # Calculate the minimal cut on the built flow-graph.
-      cut_value, partition = nx.minimum_cut(flow,
-                                            cycle[0] + ' ->',
-                                            '-> ' + cycle[0])
-
-      # Create edges from the file dependency graph in which the edge
-      # endpoints show the "direction" of the edge. (Partition contains edges
-      # between nodes named as such.)
-      cycle_file_graph_edges_namedirected = map(lambda e: (e[0] + ' ->',
-                                                           '-> ' + e[1]),
-                                                cycle_file_graph.edges)
-      cycle_file_graph_edges_namedirected = filter(
-        lambda e: e in flow.edges, cycle_file_graph_edges_namedirected)
-
-      cutting_edges = list(
-        generate_cutting_edges(cycle_file_graph_edges_namedirected, partition))
-
-      # Try fetching the list of files to move based on the cut.
-      files_to_move = _files_from_cutting_edges(module_map,
-                                                flow,
-                                                cutting_edges)
-
-      if not files_to_move:
-        # If files_to_move is a falsy value, like empty set, the cycle is
-        # deemed infeasible to solve.
-        return False
-      else:
-        # Update the list of files that are to be moved into new modules to
-        # solve this cycle, and go for the next.
-        cut_settled = True
-        file_to_new_module.update(files_to_move)
-
-  return file_to_new_module
+  return ret
