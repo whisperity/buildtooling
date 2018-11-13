@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Return codes:
+ 0 - all good.
+ 1 - error, algorithm cannot run to completion.
+ 2 - configuration error.
+"""
 
 import codecs
 import os
@@ -18,6 +24,7 @@ if not os.path.isfile("CMakeLists.txt"):
 
 
 MODULEMAP, DUPLICATES = mapping.get_module_mapping(os.getcwd())
+print(MODULEMAP.__dict__)
 DEPENDENCY_MAP = mapping.DependencyMap(MODULEMAP)
 
 if DUPLICATES:
@@ -67,35 +74,40 @@ print("\n")
 # this case...
 all_files_to_move = dict()
 module_map_infeasible = True
-ITERATION_COUNT = 1
 
 print(MODULEMAP.__dict__)
 
+# TODO: There is some nondeterminism here, sometimes we exhaust the hash length
+iteration_count = 0
 while module_map_infeasible:
-  print("-------------------------------------------------------------------")
-  print("====            BEGIN ITERATION %d            ====" % ITERATION_COUNT)
+  iteration_count += 1
+  print("------------> Begin iteration %d trying to break cycles <------------"
+        % iteration_count)
+
   files_to_move = mapping.get_circular_dependency_resolution(MODULEMAP,
                                                              DEPENDENCY_MAP)
-  if len(files_to_move) == 0:
+
+  if files_to_move is False:
+    print("Error! The modules contain circular dependencies on each other "
+          "which cannot be resolved automatically by splitting them.",
+          file=sys.stderr)
+    sys.exit(1)
+  elif files_to_move is True:
     # If the resolution of the cycles is to do nothing, there are no issues
     # with the mapping anymore.
     module_map_infeasible = False
     break
 
-  all_files_to_move.update(files_to_move)
-
-  # import json
-  # print(json.dumps(files_to_move, indent=2, sort_keys=True))
   print("Error: Modules contain circular dependencies on each other.",
         file=sys.stderr)
+  all_files_to_move.update(files_to_move)
 
+  # Alter the module map with the calculated moves, and try running the
+  # iteration again.
   mapping.apply_file_moves(MODULEMAP, DEPENDENCY_MAP, files_to_move)
-  # print(MODULEMAP.__dict__)
-  ITERATION_COUNT += 1
-  # sys.exit(1)
 
-
-sys.exit(1)
+print("Module cycles broken up successfully.")
+sys.exit(0)
 
 # TODO: Actually move the files in "all_files_to_move".
 

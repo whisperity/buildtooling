@@ -157,15 +157,18 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
   # Draw in the dependencies between distinct files from the original
   # dependency graph.
   for dependency_edge in cycle_graph.edges:
-    u, v = dependency_edge[0] + ' ->', '-> ' + dependency_edge[1]
+    edge = (dependency_edge[0] + ' ->', '-> ' + dependency_edge[1])
+    if edge not in flow.edges:
+      continue
+
     # Show the cut's edges in a different style. A cutting edge is an
     # edge which ends are in different partitions.
-    if is_cutting_edge((u, v), cut_partition):
+    if is_cutting_edge(edge, cut_partition):
       colour = '#ffa500'
       width = 4.0
       style = 'dashdot'
     else:
-      from_filename = u.replace(' ->', '').replace('-> ', '')
+      from_filename = edge[0].replace(' ->', '').replace('-> ', '')
       from_modules = list(
         dict(filter(lambda m: from_filename in m[1],
                     module_to_files_map.items())).keys())
@@ -173,10 +176,25 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
       width = 1.0
       style = 'solid'
 
+      capacity = capacities.get(edge, None)
+      if capacity is None or capacity == float('inf'):
+        nx.draw_networkx_edge_labels(flow, pos,
+                                     font_size=18,
+                                     edge_labels={edge: '\u221E'})  # Inf sym.
+        width = 0.333
+      elif capacity == 0:
+        nx.draw_networkx_edge_labels(flow, pos,
+                                     font_size=18,
+                                     edge_labels={edge: '\u2205'})  # Emptyset.
+        width = 0.333
+
     nx.draw_networkx_edges(flow, pos,
-                           edgelist=[(u, v)],
+                           edgelist=[edge],
                            width=width,
                            edge_color=colour,
                            style=style)
+    # nx.draw_networkx_edge_labels(flow, pos,
+    #                              font_size=10,
+    #                              edge_labels=capacities)
 
   plt.axis('off')
