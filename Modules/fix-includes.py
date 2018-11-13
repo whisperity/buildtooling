@@ -81,8 +81,8 @@ while module_map_infeasible:
   print("==========->> Begin iteration %d trying to break cycles <<-=========="
         % iteration_count)
 
-  files_to_move = mapping.get_circular_dependency_resolution(MODULEMAP,
-                                                             DEPENDENCY_MAP)
+  files_to_move = cycle_resolution.get_circular_dependency_resolution(
+    MODULEMAP, DEPENDENCY_MAP)
 
   if files_to_move is False:
     print("Error! The modules contain circular dependencies on each other "

@@ -1,3 +1,4 @@
-__all__ = ['include',
+__all__ = ['cycle_resolution',
+           'include',
            'mapping',
            'util']
