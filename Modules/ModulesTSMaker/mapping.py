@@ -3,7 +3,7 @@ import itertools
 import os
 import re
 import sys
-from collections import Counter
+from collections import Counter, deque
 from hashlib import md5
 from operator import itemgetter
 
@@ -511,7 +511,9 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   # broken, as another iteration of the algorithm will find a B -> ... -> B
   # cycle. In case of these files, it is more beneficial to move the
   # dependee instead.
-  for file in list(files_to_move):
+  for file in list(sorted(files_to_move)):
+    # Iterate copy of the initial files, the dict is modified in the iteration.
+    tqdm.write(" ? File candidate for moving: %s" % file)
     if file + ' ->' in flow_graph.nodes and '-> ' + file in flow_graph.nodes:
       # Move the files that are the starting points of edges leading into the
       # previously marked files.
@@ -523,14 +525,15 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
         paths = []
 
       del files_to_move[file]
-      cut_candidates = list(set(map(
+      tqdm.write(" ! File cannot be moved: %s" % file)
+      cut_candidates = deque(sorted(set(map(
         lambda e: e[0].replace('-> ', '').replace(' ->', ''),
-        filter(lambda e: file in e[1], cutting_edges))))
+        filter(lambda e: file in e[1], cutting_edges)))))
 
       # Iterate as long as we have other termini of cutting.
       while cut_candidates:
-        new_move_candidate = cut_candidates[0]
-        del cut_candidates[0]
+        new_move_candidate = cut_candidates.popleft()
+        tqdm.write(" ? File candidate for moving: %s" % new_move_candidate)
         files_to_move[new_move_candidate] = None
 
         if '-> ' + new_move_candidate in flow_graph.nodes and \
@@ -565,6 +568,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
             # The move candidate is part of a path between the insolvent
             # dependency. Try to see if other nodes in the path could be
             # moved...
+            tqdm.write(" ! File cannot be moved: %s" % new_move_candidate)
             del files_to_move[new_move_candidate]
 
             def _handle_direction(generator):
@@ -574,7 +578,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
               """
               found_any = False
               for group_in_direction in generator:
-                for file in group_in_direction:
+                for file in sorted(group_in_direction):
                   file = file.replace('-> ', '').replace(' ->', '')
 
                   if not ('-> ' + file
@@ -585,7 +589,8 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
                     # (as in that case moving it would yet again just rename
                     # the module in the cycle but won't fix the cycle...), and
                     # is also *NOT* a node that represents a module.
-                    cut_candidates.insert(0, file)
+                    # In this case, we mark this file as the next candidate.
+                    cut_candidates.append(file)
                     found_any = True
                 if found_any:
                   return True
@@ -605,10 +610,13 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
       lambda e: e[0],
       filter(lambda e: e[1] is None,
              files_to_move.items())))
-  new_module_name = _get_new_module_name(module_map,
-                                         files_moving_without_new_module_name)
+  new_module_name = _get_new_module_name(
+    module_map, sorted(files_moving_without_new_module_name))
   for file in files_moving_without_new_module_name:
     files_to_move[file] = new_module_name
+
+  tqdm.write("Will move the following files to fix the cycle:")
+  tqdm.write("    %s" % '\n    '.join(sorted(files_to_move)))
 
   return files_to_move
 
@@ -687,6 +695,7 @@ def get_circular_dependency_resolution(module_map, dependency_map):
     # Make sure it is "actually" a cycle.
     cycle.append(cycle[0])
 
+    tqdm.write("-------------------------------------------------------------")
     tqdm.write("Circular dependency between modules found on the following "
                "path:\n"
                "    %s" % ' -> '.join(cycle))
@@ -701,11 +710,13 @@ def get_circular_dependency_resolution(module_map, dependency_map):
                  "other:" % (module_A, module_B))
       files = dependency_map.get_files_creating_dependency_between(module_A,
                                                                    module_B)
-      for file_in_A, files_in_B in files.items():
-        files[file_in_A] = list(files_in_B)  # Set to list transformation.
-        for file_in_B in files_in_B:
-          tqdm.write("%s: %s" % (file_in_A, file_in_B))
-          cycle_file_graph.add_edge(file_in_A, file_in_B)
+      for file_in_A, files_in_B in sorted(files.items()):
+        files[file_in_A] = list(sorted(files_in_B))
+        tqdm.write("    %s:" % file_in_A)
+        tqdm.write("        %s" % '\n        '.join(files[file_in_A]))
+        cycle_file_graph.add_edges_from(zip(
+          itertools.repeat(file_in_A),
+          files[file_in_A]))
 
     # Map every file that spans the circular dependency to the module they
     # belong to.

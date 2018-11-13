@@ -24,7 +24,6 @@ if not os.path.isfile("CMakeLists.txt"):
 
 
 MODULEMAP, DUPLICATES = mapping.get_module_mapping(os.getcwd())
-print(MODULEMAP.__dict__)
 DEPENDENCY_MAP = mapping.DependencyMap(MODULEMAP)
 
 if DUPLICATES:
@@ -75,13 +74,11 @@ print("\n")
 all_files_to_move = dict()
 module_map_infeasible = True
 
-print(MODULEMAP.__dict__)
-
 # TODO: There is some nondeterminism here, sometimes we exhaust the hash length
 iteration_count = 0
 while module_map_infeasible:
   iteration_count += 1
-  print("------------> Begin iteration %d trying to break cycles <------------"
+  print("==========->> Begin iteration %d trying to break cycles <<-=========="
         % iteration_count)
 
   files_to_move = mapping.get_circular_dependency_resolution(MODULEMAP,
@@ -98,13 +95,10 @@ while module_map_infeasible:
     module_map_infeasible = False
     break
 
-  print("Error: Modules contain circular dependencies on each other.",
-        file=sys.stderr)
-  all_files_to_move.update(files_to_move)
-
   # Alter the module map with the calculated moves, and try running the
   # iteration again.
   mapping.apply_file_moves(MODULEMAP, DEPENDENCY_MAP, files_to_move)
+  all_files_to_move.update(files_to_move)
 
 print("Module cycles broken up successfully.")
 sys.exit(0)
