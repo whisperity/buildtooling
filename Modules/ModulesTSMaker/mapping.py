@@ -218,6 +218,7 @@ class DependencyMap():
     Removes the given :param filename: from the dependency map. Every
     depedency incident to the file is removed.
     """
+    # FIXME: THIS DOES NOT SEEM TO WORK?
     modules_to_remove = list()
 
     for module in self._map:
@@ -229,7 +230,6 @@ class DependencyMap():
         if not self._map[module]:
           # The module has emptied out.
           modules_to_remove.append(module)
-        continue
 
       # print("MODULE", module)
       files_to_remove_from_module = list()
@@ -496,7 +496,6 @@ def apply_file_moves(module_map, dependency_map, moved_files):
 
 
 def write_topological_order(module_file,
-                            fragments,
                             regex,
                             intramodule_dependencies):
   """
@@ -504,35 +503,46 @@ def write_topological_order(module_file,
   intra-dependency map. This ensures that file "fragments" included into
   the same module will follow each other in an order that depend on each other
   are satisfied without the use of header guards.
+
+  The intramodule dependency map must contain each such files to be ordered as
+  a key. If there are no dependencies, the value in the dict shall be empty, or
+  empty list.
   """
   try:
     graph = nx.DiGraph(intramodule_dependencies)
-    topological = list(nx.topological_sort(graph))
+    topological = nx.lexicographical_topological_sort(graph)
   except nx.NetworkXUnfeasible:
     print("Error! Circular dependency found in header files used in module "
           "%s. Module file cannot be rewritten!" % module_file,
           file=sys.stderr)
     return False
 
-  filtered_fragments = list(filter(regex.search, fragments))
   with codecs.open(module_file, 'r+',
                    encoding='utf-8', errors='replace') as f:
     lines = f.readlines()
 
-    # Find the "part" of the module file where the header fragments are
+    # Find the "part" of the module file where the regex-matching fragments are
     # included.
-    first_header_include, last_header_include = None, None
+    # It's an invariant that first only such are included, and then only
+    # other kinds of files!
+    first_matching_include, last_matching_include = None, None
     for num, l in enumerate(lines):
-      if os.path.basename(filtered_fragments[0]) in l:
-        first_header_include = num
-      elif os.path.basename(filtered_fragments[-1]) in l:
-        last_header_include = num
-        break
+      potentially_included_filename = include.directive_to_filename(l)
+      if not potentially_included_filename:
+        continue
 
-    if not first_header_include or not last_header_include:
-      print("Error! Module file '%s' included %s, %s at first read,"
-            "but the directive cannot be found..."
-            % (module_file, filtered_fragments[0], filtered_fragments[-1]),
+      if not first_matching_include and \
+          regex.search(potentially_included_filename):
+        first_matching_include = num
+        last_matching_include = num
+        continue
+
+      if regex.search(potentially_included_filename):
+        last_matching_include = num
+
+    if not first_matching_include or not last_matching_include:
+      print("Error! No inclusion directives found in module file."
+            % module_file,
             file=sys.stderr)
       return False
 
@@ -543,11 +553,11 @@ def write_topological_order(module_file,
       # location, but the script knows them relative to the working directory
       # at the start...
       file = file.replace(os.path.dirname(module_file), '').lstrip('/')
-      new_includes.append("#include \"%s\"\n" % file)
+      new_includes.append(include.filename_to_directive(file) + '\n')
 
-    lines = lines[:first_header_include] + \
-            new_includes[:-1] + \
-            lines[last_header_include + 1:]
+    lines = lines[:first_matching_include] + \
+            new_includes + \
+            lines[last_matching_include + 1:]
 
     f.seek(0)
     f.writelines(lines)

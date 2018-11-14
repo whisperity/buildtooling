@@ -66,18 +66,14 @@ print('\n')
 # will fall apart to N distinct modules where N is the number of translation
 # units -- unfortunately there was no improvement on modularisation made in
 # this case...
-module_map_infeasible = True
-
-iteration_count = 0
+iteration_count = 1
 with multiprocessing.Pool() as pool:
-  while module_map_infeasible:
-    iteration_count += 1
+  while True:
     print("=========->> Begin iteration %d trying to break cycles <<-========="
           % iteration_count)
 
     files_to_move = cycle_resolution.get_circular_dependency_resolution(
       pool, MODULEMAP, DEPENDENCY_MAP)
-
     if files_to_move is False:
       print("Error! The modules contain circular dependencies on each other "
             "which cannot be resolved automatically by splitting them.",
@@ -86,22 +82,21 @@ with multiprocessing.Pool() as pool:
     elif files_to_move is True:
       # If the resolution of the cycles is to do nothing, there are no issues
       # with the mapping anymore.
-      module_map_infeasible = False
+      print("Nothing to do.")
+      break
     else:
       # Alter the module map with the calculated moves, and try running the
       # iteration again.
       mapping.apply_file_moves(MODULEMAP, DEPENDENCY_MAP, files_to_move)
 
-print("Module cycles broken up successfully.")
+    iteration_count += 1
 
-
-# TODO: Actually move the files in "all_files_to_move".
 # After (and if successfully) the modules has been split up, commit the changes
 # to the file system for the upcoming operations.
-mapping.write_module_mapping(START_FOLDER, MODULEMAP)
-print('\n')
-
-sys.exit(0)
+if iteration_count > 1:
+  print("Module cycles broken up successfully.")
+  mapping.write_module_mapping(START_FOLDER, MODULEMAP)
+  print('\n')
 
 # Files can transitively and with the employment of header guards,
 # recursively include each other, which is not a problem in normal C++,
@@ -110,14 +105,14 @@ sys.exit(0)
 # However, for this module "wrapper" file to work, the includes of the
 # module "fragments" (which are rewritten by this script) must be in
 # a good order.
-for module in tqdm(MODULEMAP,
+for module in tqdm(sorted(MODULEMAP),
                    desc="Sorting module includes",
-                   unit='files'):
+                   unit='modules'):
   files_in_module = MODULEMAP.get_fragment_list(module)
-  headers_in_module = list(filter(HEADER_FILE.search, files_in_module))
+  headers_in_module = filter(HEADER_FILE.search, files_in_module)
 
   # By default, put every file known to be mapped into the module into
-  # the list.
+  # the list. (But they are not marked to have any dependencies.)
   intramodule_dependencies = dict(map(lambda x: (x, []),
                                       headers_in_module))
   # Then add the list of known dependencies from the previous built map.
@@ -126,6 +121,5 @@ for module in tqdm(MODULEMAP,
 
   mapping.write_topological_order(
     MODULEMAP.get_filename(module),
-    files_in_module,
     HEADER_FILE,
     intramodule_dependencies)
