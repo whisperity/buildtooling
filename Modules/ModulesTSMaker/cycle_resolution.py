@@ -1,4 +1,5 @@
 import itertools
+import os
 from collections import deque
 from hashlib import md5
 
@@ -12,7 +13,6 @@ except ImportError as e:
   raise
 
 from utils import graph
-from utils.graph import generate_cutting_edges
 from . import util
 
 
@@ -263,14 +263,24 @@ def _get_new_module_name(module_map, moved_files):
   if len(moved_files) == 0:
     return None
 
+  only_file = moved_files[0] if len(moved_files) == 1 else None
   digest = md5(','.join(moved_files).encode('utf-8')).hexdigest()
+
+  def _get_name(sublen):
+    if sublen > len(digest):
+      raise IndexError("Hash length of %d exhausted" % len(digest))
+
+    if only_file:
+      file_name = os.path.splitext(os.path.basename(only_file))[0]
+      return "Module_%s_%s" % (digest[:sublen], file_name)
+    else:
+      return "Module_%s" % digest[:sublen]
+
   digest_sublen = 7
-  new_name = "Module__autogen_%s" % digest[:digest_sublen]
+  new_name = _get_name(digest_sublen)
   while new_name in module_map:
     digest_sublen += 1
-    if digest_sublen > len(digest):
-      raise IndexError("Hash length of %d exhausted" % len(digest))
-    new_name = "Module__autogen_%s" % digest[:digest_sublen]
+    new_name = _get_name(digest_sublen)
 
   return new_name
 
@@ -328,7 +338,8 @@ def _parallel(cycle, module_map, dependency_map):
     lambda e: e in flow.edges, cycle_file_graph_edges_namedirected)
 
   cutting_edges = list(
-    generate_cutting_edges(cycle_file_graph_edges_namedirected, partition))
+    graph.generate_cutting_edges(cycle_file_graph_edges_namedirected,
+                                 partition))
 
   # Try fetching the list of files to move based on the cut.
   files_to_move = _files_from_cutting_edges(module_map,

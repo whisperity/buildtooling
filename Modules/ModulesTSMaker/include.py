@@ -16,6 +16,11 @@ def directive_to_filename(line):
     .rstrip(r'">')
 
 
+def filename_to_directive(filename):
+  # TODO: What if a file was included with <> instead of ""?
+  return '#include "%s"' % filename
+
+
 def filter_imports_from_includes(filename,
                                  text,
                                  modulemap,

@@ -21,6 +21,11 @@ from . import include
 MODULE_MACRO = re.compile(r'FULL_NAME_(?P<name>[\w_\-\d]+)?;[\s]*$')
 
 
+def substitute_module_macro(name):
+  return "#define MODULE_EXPORT\n" \
+         "export module FULL_NAME_" + name + ";\n"
+
+
 class ModuleMapping():
   """
   A module mapping contains the list of fragment files, inclusion directives
@@ -38,19 +43,46 @@ class ModuleMapping():
   def __iter__(self):
     return iter(self._map.keys())
 
-  def add_module(self, name, module_file):
-    if name not in self:
-      self._map[name] = {'file': module_file,
+  def __delitem__(self, module):
+    if module not in self:
+      return
+    del self._map[module]
+
+  def add_module(self, module, backing_file):
+    if module in self:
+      raise KeyError("Cannot add a module twice.")
+
+    self._map[module] = {'file': backing_file,
                          'fragments': [],
-                         'imported-modules': set()
+                         'imported-modules': set(),
+                         'tainted': True
                          }
+
+  def set_backing_file(self, module, backing_file):
+    if module not in self:
+      raise KeyError("Cannot set the backing file of a module that has not "
+                     "been added.")
+    self._map[module]['file'] = backing_file
+    self._map[module]['tainted'] = True
+
+  def set_not_tainted(self, module=None):
+    """
+    Sets the given :param module_name: or all modules to NOT tainted.
+    """
+    if module:
+      if module not in self:
+        raise KeyError("Cannot untaint a module that has not been added.")
+      self._map[module]['tainted'] = False
+    else:
+      for key in self:
+        self._map[key]['tainted'] = False
 
   def add_fragment(self, module, fragment_file):
     if module not in self:
       raise KeyError("Cannot add a fragment to a module that has not been "
                      "added.")
-
     self._map[module]['fragments'].append(fragment_file)
+    self._map[module]['tainted'] = True
 
   def remove_fragment(self, fragment_file):
     """
@@ -59,6 +91,8 @@ class ModuleMapping():
     modules_gone_empty = list()
     for module in self.filter_modules_for_fragments([fragment_file]):
       self._map[module]['fragments'].remove(fragment_file)
+      self._map[module]['tainted'] = True
+
       if not self._map[module]['fragments']:
         modules_gone_empty.append(module)
 
@@ -72,6 +106,11 @@ class ModuleMapping():
     if module not in self:
       raise KeyError("Module '%s' not found in the module mapping." % module)
     return self._map[module]['file']
+
+  def is_tainted(self, module):
+    if module not in self:
+      raise KeyError("Module '%s' not found in the module mapping." % module)
+    return self._map[module]['tainted']
 
   def get_fragment_list(self, module):
     if module not in self:
@@ -310,7 +349,7 @@ class DependencyMap():
 
 def get_module_mapping(srcdir):
   """
-  Reads up the current working directory and create a mapping of which
+  Reads up the given :param srcdir: directory and create a mapping of which
   source file (as a module fragment) is mapped into which module.
   """
   mapping = ModuleMapping()
@@ -375,7 +414,53 @@ def get_module_mapping(srcdir):
                                 counts.items()))
                     .keys())
 
+  mapping.set_not_tainted()
   return mapping, duplicated
+
+
+def write_module_mapping(srcdir, module_map):
+  """
+  Write the given :param module_map: into the :param srcdir: directory as
+  C++ Modules-TS module files.
+  """
+  old_folder = os.getcwd()
+  os.chdir(srcdir)
+
+  modules_to_delete = list()
+  for module in tqdm(sorted(module_map),
+                     desc="Writing new modules...",
+                     total=len(module_map),
+                     unit='module'):
+    if not module_map.is_tainted(module):
+      continue
+
+    backing_file = module_map.get_filename(module)
+    fragments = module_map.get_fragment_list(module)
+    if not fragments:
+      modules_to_delete.append(module)
+      if backing_file != os.devnull:
+        os.unlink(backing_file)
+      continue
+
+    if backing_file == os.devnull:
+      backing_file = os.path.join(srcdir, module + '.cppm')
+      module_map.set_backing_file(module, backing_file)
+
+    with open(backing_file, 'w') as f:
+      f.writelines([substitute_module_macro(module), '\n', '\n'])
+      for frag in fragments:
+        frag = os.path.join(srcdir, frag)
+        frag = strip_folder(os.path.dirname(backing_file), frag)
+
+        f.write(include.filename_to_directive(frag))
+        f.write('\n')
+
+  for module_to_delete in modules_to_delete:
+    del module_map[module_to_delete]
+
+  module_map.set_not_tainted()
+
+  os.chdir(old_folder)
 
 
 def apply_file_moves(module_map, dependency_map, moved_files):

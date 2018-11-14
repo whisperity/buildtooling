@@ -15,16 +15,17 @@ import sys
 from utils.progress_bar import tqdm
 from ModulesTSMaker import *
 
-
 HEADER_FILE = re.compile(r'\.(H(XX|PP|\+\+)?|h(xx|pp|\+\+)?|t(xx|pp|\+\+))$')
 
+
+START_FOLDER = os.getcwd()
 if not os.path.isfile("CMakeLists.txt"):
   print("Error: this script should be run from a source folder.",
         file=sys.stderr)
   sys.exit(2)
 
 
-MODULEMAP, DUPLICATES = mapping.get_module_mapping(os.getcwd())
+MODULEMAP, DUPLICATES = mapping.get_module_mapping(START_FOLDER)
 DEPENDENCY_MAP = mapping.DependencyMap(MODULEMAP)
 
 if DUPLICATES:
@@ -35,14 +36,6 @@ if DUPLICATES:
 # First look for header files and handle the include directives that a
 # module fragment's header includes.
 headers = list(filter(HEADER_FILE.search, MODULEMAP.get_all_fragments()))
-
-# TODO: Revert this here, this is for testing the moving algorithm.
-non_headers = set(MODULEMAP.get_all_fragments()) - set(headers)
-print("SIZE BEFORE", len(list(MODULEMAP.get_all_fragments())))
-for f in non_headers:
-  MODULEMAP.remove_fragment(f)
-print("SIZE AFTER", len(list(MODULEMAP.get_all_fragments())))
-
 for file in tqdm(headers,
                  desc="Collecting includes",
                  unit='headers',
@@ -62,9 +55,10 @@ for file in tqdm(headers,
   new_text = include.filter_imports_from_includes(
     file, content, MODULEMAP, DEPENDENCY_MAP)
 
-DEPENDENCY_MAP.synthesize_intermodule_imports()
+  # TODO: What to do with this 'new_text'? We should write it to the FS...
 
-print("\n")
+DEPENDENCY_MAP.synthesize_intermodule_imports()
+print('\n')
 
 # Check if the read module map contains circular dependencies that make the
 # current module map infeasible, and try to resolve it.
@@ -72,10 +66,8 @@ print("\n")
 # will fall apart to N distinct modules where N is the number of translation
 # units -- unfortunately there was no improvement on modularisation made in
 # this case...
-all_files_to_move = dict()
 module_map_infeasible = True
 
-# TODO: There is some nondeterminism here, sometimes we exhaust the hash length
 iteration_count = 0
 with multiprocessing.Pool() as pool:
   while module_map_infeasible:
@@ -99,12 +91,17 @@ with multiprocessing.Pool() as pool:
       # Alter the module map with the calculated moves, and try running the
       # iteration again.
       mapping.apply_file_moves(MODULEMAP, DEPENDENCY_MAP, files_to_move)
-      all_files_to_move.update(files_to_move)
 
 print("Module cycles broken up successfully.")
-sys.exit(0)
+
 
 # TODO: Actually move the files in "all_files_to_move".
+# After (and if successfully) the modules has been split up, commit the changes
+# to the file system for the upcoming operations.
+mapping.write_module_mapping(START_FOLDER, MODULEMAP)
+print('\n')
+
+sys.exit(0)
 
 # Files can transitively and with the employment of header guards,
 # recursively include each other, which is not a problem in normal C++,
