@@ -8,9 +8,13 @@
 
 #include <llvm/Support/FileSystem.h>
 
+#include "TheFinder.h"
+
 using namespace clang;
+using namespace clang::ast_matchers;
 using namespace clang::tooling;
 using namespace llvm::sys::fs;
+using namespace SymbolRewriter;
 
 int main(int argc, const char** argv)
 {
@@ -54,6 +58,14 @@ int main(int argc, const char** argv)
     }
 
     // ----------------------- Execute the FrontendAction ----------------------
-    ClangTool Tool(*CompDb, CompDb->getAllFiles());
-    return Tool.run(newFrontendActionFactory<DeclContextPrintAction>().get());
+    for (const std::string& File : CompDb->getAllFiles())
+    {
+        // QUESTION: It would be nice if this thing ran parallel.
+        ClangTool Tool(*CompDb, {File});
+        MatcherFactory Factory{File};
+
+        std::cout << "Running for '" << File << "'" << std::endl;
+        int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
+        std::cout << "Result code: " << Result << std::endl;
+    }
 }

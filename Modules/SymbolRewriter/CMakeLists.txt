@@ -14,7 +14,7 @@ include_directories(SYSTEM
 
 # A Clang tool needs the Clang-specific standard headers in the
 # "../lib/clang/<version>/include" folder so that tooling works.
-add_custom_target(ClangLibs
+add_custom_target(ClangHeaders
     ALL
     mkdir -p ../lib
     COMMAND rm -f ../lib/clang
@@ -24,10 +24,13 @@ add_custom_target(ClangLibs
 link_directories(${LLVM_LIBRARY_DIRS} ${CLANG_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS} ${CLANG_DEFINITIONS})
 
-add_executable(SymbolRewriter main.cpp)
-add_dependencies(SymbolRewriter ClangLibs)
+add_executable(SymbolRewriter
+    main.cpp
+    TheFinder.cpp)
 target_link_libraries(SymbolRewriter PRIVATE
     clang
+    clangAST
+    clangASTMatchers
     clangBasic
     clangFrontend
     clangTooling
