@@ -25,6 +25,16 @@ if not os.path.isfile("CMakeLists.txt"):
   sys.exit(2)
 
 
+# In the end after some heuristics, C++ files will be concatenated after one
+# another into a "new TU" (of the module) which makes this new TU not compile
+# as it is, because, for example, there are types in the anonymous namespace
+# that conflict with a later file fragment.
+# QUESTION: How to do the original search and rewriting in one step?
+# TODO: Just simply rewrite the anonymous namespaces to a "filename" namespace
+# and then every other namespace using it should get a using block.
+pass
+
+
 MODULEMAP, DUPLICATES = mapping.get_module_mapping(START_FOLDER)
 DEPENDENCY_MAP = mapping.DependencyMap(MODULEMAP)
 
@@ -33,12 +43,13 @@ if DUPLICATES:
         "had been removed from the mapping!", file=sys.stderr)
   print('\n'.join(DUPLICATES), file=sys.stderr)
 
+
 # First look for header files and handle the include directives that a
 # module fragment's header includes.
 headers = list(filter(HEADER_FILE.search, MODULEMAP.get_all_fragments()))
 for file in tqdm(headers,
                  desc="Collecting includes",
-                 unit='headers',
+                 unit='header',
                  position=1):
   if not re.search(HEADER_FILE, file):
     continue
@@ -60,6 +71,7 @@ for file in tqdm(headers,
 DEPENDENCY_MAP.synthesize_intermodule_imports()
 print('\n')
 
+
 # Check if the read module map contains circular dependencies that make the
 # current module map infeasible, and try to resolve it.
 # It is to be noted that this algorithm is finite, as worst case the system
@@ -69,7 +81,7 @@ print('\n')
 iteration_count = 1
 with multiprocessing.Pool() as pool:
   while True:
-    print("=========->> Begin iteration %d trying to break cycles <<-========="
+    print("========->> Begin iteration %d trying to break cycles.. <<-========"
           % iteration_count)
 
     files_to_move = cycle_resolution.get_circular_dependency_resolution(
@@ -98,6 +110,7 @@ if iteration_count > 1:
   mapping.write_module_mapping(START_FOLDER, MODULEMAP)
   print('\n')
 
+
 # Files can transitively and with the employment of header guards,
 # recursively include each other, which is not a problem in normal C++,
 # but for imports this must be evaded, as the files are put into a module
@@ -106,8 +119,8 @@ if iteration_count > 1:
 # module "fragments" (which are rewritten by this script) must be in
 # a good order.
 for module in tqdm(sorted(MODULEMAP),
-                   desc="Sorting module includes",
-                   unit='modules'):
+                   desc="Sorting headers",
+                   unit='module'):
   files_in_module = MODULEMAP.get_fragment_list(module)
   headers_in_module = filter(HEADER_FILE.search, files_in_module)
 
@@ -123,3 +136,12 @@ for module in tqdm(sorted(MODULEMAP),
     MODULEMAP.get_filename(module),
     HEADER_FILE,
     intramodule_dependencies)
+
+
+# Headers have been moved and ordered at this point, but only the module files
+# are changed, not the original source code. The next step is to move the
+# non-header files alongside with the headers, for the types they implement
+# (as modules need to contain interface and implementation in the same "TU").
+# QUESTION: How to find which original C++ source code implements which header?
+# ("Same filename" seems like a good enough heuristic but we might need more.)
+pass

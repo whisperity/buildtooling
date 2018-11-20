@@ -218,7 +218,6 @@ class DependencyMap():
     Removes the given :param filename: from the dependency map. Every
     depedency incident to the file is removed.
     """
-    # FIXME: THIS DOES NOT SEEM TO WORK?
     modules_to_remove = list()
 
     for module in self._map:
@@ -532,7 +531,7 @@ def write_topological_order(module_file,
         continue
 
       if not first_matching_include and \
-          regex.search(potentially_included_filename):
+            regex.search(potentially_included_filename):
         first_matching_include = num
         last_matching_include = num
         continue

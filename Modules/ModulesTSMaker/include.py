@@ -58,7 +58,7 @@ def filter_imports_from_includes(filename,
 
   lines_to_keep = []
   for line in tqdm(include_lines,
-                   unit='directives',
+                   unit='directive',
                    desc=os.path.basename(filename),
                    position=0,
                    leave=False):
