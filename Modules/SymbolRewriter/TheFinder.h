@@ -26,6 +26,12 @@ public:
 private:
     clang::ast_matchers::MatchFinder TheFinder;
     std::vector<clang::ast_matchers::MatchFinder::MatchCallback*> Callbacks;
+
+    template <class Handler>
+    clang::ast_matchers::MatchFinder::MatchCallback* CreateCallback();
+
+    template <class Handler, class Matcher>
+    inline void AddIDBoundMatcher(Matcher&& TheMatcher);
 };
 
 } // namespace SymbolRewriter
