@@ -2,16 +2,12 @@
 #include <memory>
 #include <string>
 
-#include <clang/Frontend/FrontendActions.h>
 #include <clang/Tooling/CompilationDatabase.h>
-#include <clang/Tooling/Tooling.h>
-
 #include <llvm/Support/FileSystem.h>
 
-#include "TheFinder.h"
+#include "Executor.h"
 
 using namespace clang;
-using namespace clang::ast_matchers;
 using namespace clang::tooling;
 using namespace llvm::sys::fs;
 using namespace SymbolRewriter;
@@ -61,11 +57,6 @@ int main(int argc, const char** argv)
     for (const std::string& File : CompDb->getAllFiles())
     {
         // QUESTION: It would be nice if this thing ran parallel.
-        ClangTool Tool(*CompDb, {File});
-        MatcherFactory Factory{File};
-
-        std::cout << "Running for '" << File << "'" << std::endl;
-        int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
-        std::cout << "Result code: " << Result << std::endl;
+        ExecuteTool(*CompDb, File);
     }
 }

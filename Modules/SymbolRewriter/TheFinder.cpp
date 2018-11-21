@@ -19,19 +19,7 @@ public:
     void run(const MatchFinder::MatchResult& Result) override
     {
         auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
-        if (!ND)
-        {
-            std::cerr << "Error! Something was matched, but it is not a "
-                         "`NamedDecl`..." << std::endl;
-            auto* D = Result.Nodes.getNodeAs<Decl>("id");
-            if (!D)
-                std::cerr << "Even bigger error! It's not even a `Decl`?!"
-                          << std::endl;
-            else
-                D->dump();
-
-            return;
-        }
+        assert(ND && "Something matched as `id` but it wasn't a `NamedDecl`?");
 
         std::cout << "Matched problematic symbol " << ND->getDeclKindName()
                   << ": " << ND->getName().str() << std::endl;
@@ -128,7 +116,7 @@ MatcherFactory::MatcherFactory(const std::string& Filename)
         AddIDBoundMatcher<HandleDeclarations>(Matcher);
 
     // Add a matchers that will report the usage of such a named declaration.
-    {
+    /*{
         auto ProblematicDeclUsages = {
             // These matchers match on every type locations that eventually name
             // problematic types.
@@ -146,7 +134,7 @@ MatcherFactory::MatcherFactory(const std::string& Filename)
         };
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);
-    }
+    }*/
 }
 
 MatcherFactory::~MatcherFactory()

@@ -38,4 +38,4 @@ private:
 
 } // namespace SymbolRewriter
 
-#endif //SYMBOLREWRITER_THEVISITOR_H
+#endif // SYMBOLREWRITER_THEVISITOR_H

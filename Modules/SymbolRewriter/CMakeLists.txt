@@ -23,11 +23,8 @@ add_custom_target(ClangHeaders
 
 link_directories(${LLVM_LIBRARY_DIRS} ${CLANG_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS} ${CLANG_DEFINITIONS})
-
-add_executable(SymbolRewriter
-    main.cpp
-    TheFinder.cpp)
-target_link_libraries(SymbolRewriter PRIVATE
+set(LLVM_LIBRARIES_USED "")
+list(APPEND LLVM_LIBRARIES_USED
     clang
     clangAST
     clangASTMatchers
@@ -35,3 +32,33 @@ target_link_libraries(SymbolRewriter PRIVATE
     clangFrontend
     clangTooling
     LLVMSupport)
+
+add_library(RewritingTool STATIC
+    Executor.cpp
+    TheFinder.cpp)
+
+add_executable(SymbolRewriter
+    main.cpp)
+target_link_libraries(SymbolRewriter
+    RewritingTool
+    ${LLVM_LIBRARIES_USED})
+
+enable_testing()
+find_package(GTest)
+
+include_directories(SYSTEM
+    ${GTEST_INCLUDE_DIRS})
+add_executable(RewriteTest
+    Test.cpp)
+target_link_libraries(RewriteTest
+    RewritingTool
+    ${GTEST_BOTH_LIBRARIES}
+    ${LLVM_LIBRARIES_USED}
+    pthread)
+
+add_test(
+    NAME RewriteTest
+    COMMAND RewriteTest)
+add_custom_target(check
+    COMMAND ${CMAKE_CTEST_COMMAND}
+    DEPENDS RewriteTest)
