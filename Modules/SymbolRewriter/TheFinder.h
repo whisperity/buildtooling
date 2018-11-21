@@ -31,6 +31,8 @@ private:
     clang::ast_matchers::MatchFinder::MatchCallback* CreateCallback();
 
     template <class Handler, class Matcher>
+    inline void AddIDBoundMatcher(const char* ID, Matcher&& TheMatcher);
+    template <class Handler, class Matcher>
     inline void AddIDBoundMatcher(Matcher&& TheMatcher);
 };
 
