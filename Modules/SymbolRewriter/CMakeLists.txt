@@ -48,8 +48,10 @@ find_package(GTest)
 
 include_directories(SYSTEM
     ${GTEST_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_executable(RewriteTest
-    Test.cpp)
+    Test.cpp
+    tests/MatchProblematicDeclarations.cpp)
 target_link_libraries(RewriteTest
     RewritingTool
     ${GTEST_BOTH_LIBRARIES}

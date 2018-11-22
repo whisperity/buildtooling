@@ -14,6 +14,9 @@ namespace SymbolRewriter
 class FileReplaceDirectives
 {
 public:
+    typedef std::pair<size_t, size_t> Position;
+    typedef std::pair<std::string, std::string> ReplacementPair;
+
     /**
      * Creates a replacement holder for the file. The marked tokens will be
      * renamed to have 'RewritePrefix' in front of their name.
@@ -46,9 +49,17 @@ public:
 
     const std::string& getFilepath() const;
 
-private:
-    typedef std::pair<std::string, std::string> ReplacementPair;
+    /**
+     *
+     */
+    std::vector<Position> getReplacementPositions() const;
 
+    /**
+     *
+     */
+    ReplacementPair getReplacementAt(size_t Line, size_t Column) const;
+
+private:
     /**
      * Detail record that marks a particular position in the file where a given
      * string is to be replaced according to the binding pointed by the node

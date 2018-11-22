@@ -41,6 +41,23 @@ const std::string& FileReplaceDirectives::getFilepath() const
     return Filepath;
 }
 
+std::vector<FileReplaceDirectives::Position>
+FileReplaceDirectives::getReplacementPositions() const
+{
+    std::vector<std::pair<size_t, size_t>> Ret{};
+
+    for (const Replacement& Rep : Replacements)
+        Ret.emplace_back(Rep.Line, Rep.Col);
+
+    return Ret;
+}
+
+FileReplaceDirectives::ReplacementPair
+FileReplaceDirectives::getReplacementAt(size_t Line, size_t Column) const
+{
+    // FIXME: Implement this!
+}
+
 FileReplaceDirectives::Replacement::Replacement(size_t Line,
                                                 size_t Col,
                                                 std::string What,
