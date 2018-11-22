@@ -6,6 +6,7 @@
 #include <llvm/Support/FileSystem.h>
 
 #include "Executor.h"
+#include "Replacement.h"
 
 using namespace clang;
 using namespace clang::tooling;

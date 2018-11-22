@@ -1,31 +1,43 @@
 #include "Executor.h"
-#include "TheFinder.h"
 
 #include <algorithm>
 #include <iostream>
 
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
+#include <llvm/Support/Path.h>
+
+#include "Replacement.h"
+#include "TheFinder.h"
 
 using namespace clang::tooling;
+using namespace llvm::sys::path;
 
 namespace SymbolRewriter
 {
 
-int ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
-                const std::string& Filename)
+ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
+                       const std::string& Filename)
 {
     ClangTool Tool(CompDb, {Filename});
     std::cout << "Running for '" << Filename << "'" << std::endl;
-    MatcherFactory Factory{Filename};
+
+    auto Replacements = std::make_unique<FileReplaceDirectives>(
+        Filename, stem(Filename));
+
+    MatcherFactory Factory{Filename, *Replacements};
+
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
     std::cout << "Result code: " << Result << std::endl;
-    return Result;
+
+    if (Result)
+        return Result;
+    return std::move(Replacements);
 }
 
-int ExecuteTool(const FileMap& FileMap,
-                const std::string& SourceName,
-                const std::vector<std::string>& CompileCommand)
+ToolResult ExecuteTool(const FileMap& FileMap,
+                       const std::string& SourceName,
+                       const std::vector<std::string>& CompileCommand)
 {
     std::vector<const char*> Argv;
     Argv.reserve(CompileCommand.size());
@@ -54,10 +66,17 @@ int ExecuteTool(const FileMap& FileMap,
     for (const auto& e : FileMap)
         Tool.mapVirtualFile(e.first, e.second);
     std::cout << "Running for '" << SourceName << "'" << std::endl;
-    MatcherFactory Factory{SourceName};
+
+    auto Replacements = std::make_unique<FileReplaceDirectives>(
+        SourceName, stem(SourceName));
+    MatcherFactory Factory{SourceName, *Replacements};
+
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
     std::cout << "Result code: " << Result << std::endl;
-    return Result;
+
+    if (Result)
+        return Result;
+    return std::move(Replacements);
 }
 
 } // namespace SymbolRewriter

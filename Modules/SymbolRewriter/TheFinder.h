@@ -9,6 +9,8 @@
 namespace SymbolRewriter
 {
 
+class FileReplaceDirectives;
+
 /**
  * A helper class that creates the necessary matchers for this tool based on the
  * given filename to search for.
@@ -18,12 +20,15 @@ namespace SymbolRewriter
 class MatcherFactory
 {
 public:
-    MatcherFactory(const std::string& Filename);
+    MatcherFactory(const std::string& Filename,
+                   FileReplaceDirectives& Replacements);
     ~MatcherFactory();
 
     clang::ast_matchers::MatchFinder& operator()();
 
 private:
+    FileReplaceDirectives& Replacements;
+
     clang::ast_matchers::MatchFinder TheFinder;
     std::vector<clang::ast_matchers::MatchFinder::MatchCallback*> Callbacks;
 

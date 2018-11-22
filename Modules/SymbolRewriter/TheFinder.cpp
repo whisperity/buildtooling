@@ -4,8 +4,14 @@
 
 #include <clang/AST/DeclCXX.h>
 
+#include "Replacement.h"
+
 using namespace clang;
 using namespace clang::ast_matchers;
+using namespace SymbolRewriter;
+
+namespace
+{
 
 /**
  * A match result callback class that handles the rewriting of problematic
@@ -16,6 +22,10 @@ class HandleDeclarations
 {
 
 public:
+    HandleDeclarations(FileReplaceDirectives& Replacements)
+        : Replacements(Replacements)
+    {}
+
     void run(const MatchFinder::MatchResult& Result) override
     {
         auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
@@ -23,8 +33,27 @@ public:
 
         std::cout << "Matched problematic symbol " << ND->getDeclKindName()
                   << ": " << ND->getName().str() << std::endl;
+
+        const std::string& DeclName = ND->getName().str();
+        PresumedLoc PLoc =
+            Result.SourceManager->getPresumedLoc(ND->getBeginLoc(), false);
+
+        Replacements.SetReplacementBinding(ND->getName().str(), ND);
+        assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
+                                 "Decl.");
+        assert(Replacements.getFilepath() == PLoc.getFilename() &&
+               "The file name for the matched Decl's location is not in the "
+               "file where replacements take place.");
+
+        Replacements.AddReplacementPosition(
+            PLoc.getLine(),
+            PLoc.getColumn(),
+            DeclName,
+            ND);
     }
 
+private:
+    FileReplaceDirectives& Replacements;
 };
 
 /**
@@ -34,6 +63,23 @@ class HandleUsagePoints
     : public MatchFinder::MatchCallback
 {
 
+public:
+    HandleUsagePoints(FileReplaceDirectives& Replacements)
+        : Replacements(Replacements)
+    {}
+
+    void run(const MatchFinder::MatchResult& Result) override
+    {
+        const auto Item = Result.Nodes.getMap().begin();
+        if (Item->first == "typeLoc")
+            return HandleTypeLoc(Result.Nodes.getNodeAs<TypeLoc>("typeLoc"),
+                                 *Result.SourceManager);
+        if (Item->first == "declRefExpr")
+            return HandleDeclRefExpr(
+                Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"));
+    }
+
+private:
     void HandleTypeLoc(const TypeLoc* Loc, const SourceManager& SM)
     {
         std::cout << "Matched mention of problematic type symbol starting at "
@@ -48,22 +94,8 @@ class HandleUsagePoints
         DRE->dumpColor();
     }
 
-public:
-    void run(const MatchFinder::MatchResult& Result) override
-    {
-        const auto Item = Result.Nodes.getMap().begin();
-        if (Item->first == "typeLoc")
-            return HandleTypeLoc(Result.Nodes.getNodeAs<TypeLoc>("typeLoc"),
-                                 *Result.SourceManager);
-        if (Item->first == "declRefExpr")
-            return HandleDeclRefExpr(
-                Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"));
-    }
-
+    FileReplaceDirectives& Replacements;
 };
-
-namespace
-{
 
 /**
  * Search all declarations that have a usable name identifier, and that are
@@ -102,7 +134,9 @@ auto TUInternalTraits = allOf(LocalInTheTU, InSomeGlobalishScope);
 namespace SymbolRewriter
 {
 
-MatcherFactory::MatcherFactory(const std::string& Filename)
+MatcherFactory::MatcherFactory(const std::string& Filename,
+                               FileReplaceDirectives& Replacements)
+   : Replacements(Replacements)
 {
     // Create matchers for named declarations which are to be renamed.
     auto ProblematicNamedDeclarations = {
@@ -116,7 +150,7 @@ MatcherFactory::MatcherFactory(const std::string& Filename)
         AddIDBoundMatcher<HandleDeclarations>(Matcher);
 
     // Add a matchers that will report the usage of such a named declaration.
-    /*{
+    {
         auto ProblematicDeclUsages = {
             // These matchers match on every type locations that eventually name
             // problematic types.
@@ -134,7 +168,7 @@ MatcherFactory::MatcherFactory(const std::string& Filename)
         };
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);
-    }*/
+    }
 }
 
 MatcherFactory::~MatcherFactory()
@@ -150,7 +184,7 @@ MatchFinder& MatcherFactory::operator()() { return TheFinder; }
 template <class Handler>
 MatchFinder::MatchCallback* MatcherFactory::CreateCallback()
 {
-    Callbacks.push_back(new Handler{});
+    Callbacks.push_back(new Handler{this->Replacements});
     return Callbacks.back();
 }
 
