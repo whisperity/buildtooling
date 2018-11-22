@@ -50,14 +50,15 @@ public:
     const std::string& getFilepath() const;
 
     /**
-     *
+     * Retrieve the positions near where replacements should take place.
      */
     std::vector<Position> getReplacementPositions() const;
 
     /**
-     *
+     * Retrieve the locations near where replacements should take place,
+     * alongside with the actual strings to replace.
      */
-    ReplacementPair getReplacementAt(size_t Line, size_t Column) const;
+    std::map<Position, ReplacementPair> getReplacements() const;
 
 private:
     /**

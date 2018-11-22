@@ -23,7 +23,16 @@ UsableResult getReplacementsForCompilation(
     return std::move(std::get<UsableResult>(Result));
 }
 
-bool inPositionVector(
+bool positionFound(
+    const std::map<FileReplaceDirectives::Position,
+                   FileReplaceDirectives::ReplacementPair>& RMap,
+    size_t Line,
+    size_t Col)
+{
+    return RMap.find(std::make_pair(Line, Col)) != RMap.end();
+}
+
+bool positionFound(
     const std::vector<FileReplaceDirectives::Position>& PVec,
     size_t Line,
     size_t Col)
@@ -33,6 +42,17 @@ bool inPositionVector(
            PVec.end();
 }
 
+bool nameMatched(
+    const std::map<FileReplaceDirectives::Position,
+                   FileReplaceDirectives::ReplacementPair>& RMap,
+    std::string Name)
+{
+    return std::find_if(RMap.begin(), RMap.end(),
+        [&Name](auto& E)
+        {
+            return E.second.first == Name;
+        }) != RMap.end();
+}
 
 int main(int argc, const char** argv)
 {

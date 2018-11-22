@@ -24,10 +24,11 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "main.cpp", TrivialCompileCommand);
-    auto R = FRD->getReplacementPositions();
+    auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(inPositionVector(R, 4, 5));
+    ASSERT_TRUE(positionFound(R, 4, 5));
+    ASSERT_TRUE(nameMatched(R, "MyIntType"));
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleRecord)
@@ -43,10 +44,11 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "main.cpp", TrivialCompileCommand);
-    auto R = FRD->getReplacementPositions();
+    auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(inPositionVector(R, 4, 5));
+    ASSERT_TRUE(positionFound(R, 4, 5));
+    ASSERT_TRUE(nameMatched(R, "S"));
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleGlobalVar)
@@ -62,10 +64,11 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "main.cpp", TrivialCompileCommand);
-    auto R = FRD->getReplacementPositions();
+    auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(inPositionVector(R, 4, 5));
+    ASSERT_TRUE(positionFound(R, 4, 5));
+    ASSERT_TRUE(nameMatched(R, "i"));
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleFunction)
@@ -81,10 +84,11 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "main.cpp", TrivialCompileCommand);
-    auto R = FRD->getReplacementPositions();
+    auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(inPositionVector(R, 4, 5));
+    ASSERT_TRUE(positionFound(R, 4, 5));
+    ASSERT_TRUE(nameMatched(R, "f"));
 }
 
 TEST(MatchProblematicDeclarations, StaticGlobalVar)
@@ -98,10 +102,11 @@ extern int i2; // no-match
 
     auto FRD = getReplacementsForCompilation(
         map, "main.cpp", TrivialCompileCommand);
-    auto R = FRD->getReplacementPositions();
+    auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(inPositionVector(R, 2, 1));
+    ASSERT_TRUE(positionFound(R, 2, 1));
+    ASSERT_TRUE(nameMatched(R, "i"));
 }
 
 TEST(MatchProblematicDeclarations, StaticFunction)
@@ -114,8 +119,9 @@ static void f() {}
 
     auto FRD = getReplacementsForCompilation(
         map, "main.cpp", TrivialCompileCommand);
-    auto R = FRD->getReplacementPositions();
+    auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(inPositionVector(R, 2, 1));
+    ASSERT_TRUE(positionFound(R, 2, 1));
+    ASSERT_TRUE(nameMatched(R, "f"));
 }

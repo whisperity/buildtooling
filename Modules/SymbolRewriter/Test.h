@@ -24,9 +24,20 @@ UsableResult getReplacementsForCompilation(
     const std::string& Filename,
     const std::vector<std::string>& CompileCommand);
 
-bool inPositionVector(
+bool positionFound(
     const std::vector<FileReplaceDirectives::Position>& PVec,
     size_t Line,
     size_t Col);
+
+bool positionFound(
+    const std::map<FileReplaceDirectives::Position,
+                   FileReplaceDirectives::ReplacementPair>& RMap,
+    size_t Line,
+    size_t Col);
+
+bool nameMatched(
+    const std::map<FileReplaceDirectives::Position,
+                   FileReplaceDirectives::ReplacementPair>& RMap,
+    std::string Name);
 
 #endif // SYMBOLREWRITER_TEST_H

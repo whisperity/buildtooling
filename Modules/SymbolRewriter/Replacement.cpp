@@ -52,10 +52,19 @@ FileReplaceDirectives::getReplacementPositions() const
     return Ret;
 }
 
-FileReplaceDirectives::ReplacementPair
-FileReplaceDirectives::getReplacementAt(size_t Line, size_t Column) const
+std::map<FileReplaceDirectives::Position,
+         FileReplaceDirectives::ReplacementPair>
+FileReplaceDirectives::getReplacements() const
 {
-    // FIXME: Implement this!
+    std::map<FileReplaceDirectives::Position,
+             FileReplaceDirectives::ReplacementPair> Ret;
+
+    for (const Replacement& Rep : Replacements)
+        Ret.emplace(std::make_pair(Rep.Line, Rep.Col),
+                    std::make_pair(Rep.What, "UNKNOWN"));
+        // FIXME: The "unknown" should be an actual replacement!
+
+    return Ret;
 }
 
 FileReplaceDirectives::Replacement::Replacement(size_t Line,
