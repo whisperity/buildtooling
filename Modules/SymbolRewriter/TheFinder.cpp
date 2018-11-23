@@ -14,6 +14,38 @@ namespace
 {
 
 /**
+ * Search all declarations that have a usable name identifier, and that are
+ * expanded in the main file - i.e. they aren't in the TU because they are in
+ * an included header.
+ */
+auto LocalInTheTU = namedDecl(
+    allOf(
+        unless(hasExternalFormalLinkage()),
+        isExpansionInMainFile()));
+
+/**
+ * However, the previous matcher would also match things like a local variable
+ * in a "static void f()". For this very reason, we only consider "things" that
+ * are kinda global-y in the TU itself, i.e. they are in the truly global scope,
+ * or in a namespace.
+ *
+ * E.g. inner classes need not be matched, because if their outer class' name is
+ * rewritten, the inner class can be properly referenced.
+ */
+auto InSomeGlobalishScope = anyOf(
+    hasParent(translationUnitDecl()),
+    hasParent(namespaceDecl()));      /* NOTE: Need to match every namespace
+                                       * because one can put a TU-local typedef
+                                       * or class into a non-anonymous namespace
+                                       * which is still visible only to that TU.
+                                       */
+
+/**
+ * Renaming such TU-Internal declarations is enough to break ambiguity.
+ */
+auto TUInternalTraits = allOf(LocalInTheTU, InSomeGlobalishScope);
+
+/**
  * A match result callback class that handles the rewriting of problematic
  * declarations.
  */
@@ -36,7 +68,7 @@ public:
 
         const std::string& DeclName = ND->getName().str();
         PresumedLoc PLoc =
-            Result.SourceManager->getPresumedLoc(ND->getLocStart(), false);
+            Result.SourceManager->getPresumedLoc(ND->getLocation(), false);
 
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
         assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
@@ -94,33 +126,45 @@ private:
                "The file name for the matched TypeLoc's location is not in the "
                "file where replacements take place.");
 
+        const Type* Type = Loc->getTypePtr();
         // Try different kinds of type location usages.
-        {
-            auto TypedefLoc = Loc->getAs<TypedefTypeLoc>();
-            if (!TypedefLoc.isNull())
-            {
-                // In this case, the binding is the typedef that got used.
-                Replacements.AddReplacementPosition(
-                    PLoc.getLine(),
-                    PLoc.getColumn(),
-                    TypedefLoc.getTypedefNameDecl()->getName().str(),
-                    TypedefLoc.getTypedefNameDecl());
-                return;
-            }
-        }
-        {
-            auto RecordLoc = Loc->getAs<RecordTypeLoc>();
-            if (!RecordLoc.isNull())
-            {
-                // In this case, the binding is the record type that got used.
-                Replacements.AddReplacementPosition(
-                    PLoc.getLine(),
-                    PLoc.getColumn(),
-                    RecordLoc.getDecl()->getName().str(),
-                    RecordLoc.getDecl());
-                return;
-            }
-        }
+        if (HandleDeclForTypeLoc<TypedefNameDecl>(
+            Type->getAsAdjusted<TypedefType>(), PLoc))
+            return;
+
+        if (HandleDeclForTypeLoc<RecordDecl>(
+                Type->getAsAdjusted<RecordType>(), PLoc))
+            return;
+
+        // It's not directly a problem if a TypeLoc was matched that does not
+        // refer to any of the above cases.
+    }
+
+    /**
+     * Helper function that matches on a Type's declaration and adds a rewrite
+     * to the TypeLoc at the file position PLoc if certain criteria (such as
+     * the referred Decl being in the local translation unit's global scope,
+     * not coming from an externally nameable namespace) match.
+     */
+    template <typename DeclT, typename TypeT>
+    bool HandleDeclForTypeLoc(const TypeT* Ty, const PresumedLoc& PLoc)
+    {
+        if (!Ty)
+            return false;
+        const DeclT* D = Ty->getDecl();
+        if (!D)
+            return false;
+
+        // Try to see if the TypeLoc's referred Decl matches the usual criteria.
+        auto Match = ast_matchers::match(
+            decl(TUInternalTraits), *D, D->getASTContext());
+        if (Match.empty())
+            return false;
+
+        Replacements.AddReplacementPosition(
+            PLoc.getLine(), PLoc.getColumn(), D->getName().str(), D);
+
+        return true;
     }
 
     void HandleDeclRefExpr(const DeclRefExpr* DRE, const SourceManager& SM)
@@ -144,39 +188,6 @@ private:
     FileReplaceDirectives& Replacements;
 };
 
-/**
- * Search all declarations that have a usable name identifier, and that are
- * expanded in the main file - i.e. they aren't in the TU because they are in
- * an included header.
- */
-// FIXME: This does not capture records that are in the TU's global scope.
-auto LocalInTheTU = namedDecl(
-    allOf(
-        unless(hasExternalFormalLinkage()),
-        isExpansionInMainFile()));
-
-/**
- * However, the previous matcher would also match things like a local variable
- * in a "static void f()". For this very reason, we only consider "things" that
- * are kinda global-y in the TU itself, i.e. they are in the truly global scope,
- * or in a namespace.
- *
- * E.g. inner classes need not be matched, because if their outer class' name is
- * rewritten, the inner class can be properly referenced.
- */
-auto InSomeGlobalishScope = anyOf(
-    hasParent(translationUnitDecl()),
-    hasParent(namespaceDecl()));      /* NOTE: Need to match every namespace
-                                       * because one can put a TU-local typedef
-                                       * or class into a non-anonymous namespace
-                                       * which is still visible only to that TU.
-                                       */
-
-/**
- * Renaming such TU-Internal declarations is enough to break ambiguity.
- */
-auto TUInternalTraits = allOf(LocalInTheTU, InSomeGlobalishScope);
-
 } // namespace (anonymous)
 
 namespace SymbolRewriter
@@ -199,18 +210,25 @@ MatcherFactory::MatcherFactory(const std::string& Filename,
 
     // Add a matchers that will report the usage of such a named declaration.
     {
+        auto DeclaringToRecord = hasDeclaration(recordDecl(TUInternalTraits));
+        auto DeclaringToTypedef = hasDeclaration(
+            typedefNameDecl(TUInternalTraits));
+
         auto ProblematicDeclUsages = {
-            // These matchers match on every type locations that eventually name
-            // problematic types.
-            loc(qualType(hasDeclaration(recordDecl(TUInternalTraits)))),
-            loc(qualType(hasDeclaration(typedefNameDecl(TUInternalTraits))))
+            // Match type locations that are in the main file.
+            // (This will match, e.g. for a "const T*&", the outer type
+            // const&, the inner type T*, and the innermost type T. In case this
+            // T is a problematic symbol, a match will eventually take care of
+            // it.
+            typeLoc(isExpansionInMainFile())
         };
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("typeLoc", Matcher);
     }
     {
         auto ProblematicDeclUsages = {
-            // These matchers match the references to the problematic callables.
+            // These matchers match declaration references to problematic
+            // TU-local functions or variables.
             declRefExpr(to(functionDecl(TUInternalTraits))),
             declRefExpr(to(varDecl(TUInternalTraits)))
         };

@@ -27,7 +27,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "MyIntType", 4, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "MyIntType", 4, 17));
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleRecord)
@@ -46,7 +46,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "S", 4, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "S", 4, 12));
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleGlobalVar)
@@ -65,7 +65,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "i", 4, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "i", 4, 9));
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleFunction)
@@ -84,7 +84,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 4, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 4, 10));
 }
 
 TEST(MatchProblematicDeclarations, StaticGlobalVar)
@@ -92,7 +92,7 @@ TEST(MatchProblematicDeclarations, StaticGlobalVar)
     FileMap map = {
         {"main.cpp", R"FILE(
 static int i;
-extern int i2; // no-match
+extern int i2; // This should not match as the global name 'i2' has linkage.
 )FILE"}
     };
 
@@ -101,7 +101,8 @@ extern int i2; // no-match
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "i", 2, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "i", 2, 12));
+    ASSERT_FALSE(nameMatched(R, "i2"));
 }
 
 TEST(MatchProblematicDeclarations, StaticFunction)
@@ -117,7 +118,7 @@ static void f() {}
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 2, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 2, 13));
 }
 
 TEST(MatchProblematicDeclarations, MultiSymbolOneMatches)
@@ -137,8 +138,8 @@ namespace X
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "T", 4, 5));
-    ASSERT_FALSE(nameMatchedAtPosition(R, "f", 5, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "T", 4, 17));
+    ASSERT_FALSE(nameMatched(R, "f"));
 }
 
 TEST(MatchProblematicDeclarations, MultiSymbolManyMatches)
@@ -162,7 +163,7 @@ namespace X
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "T", 4, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "T", 4, 17));
     ASSERT_FALSE(nameMatched(R, "S"));
     ASSERT_FALSE(nameMatched(R, "f"));
 }
@@ -184,6 +185,7 @@ typedef int T;
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "T"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleTypedefInHeaderNS)
@@ -206,6 +208,7 @@ namespace X
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "T"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeader)
@@ -225,6 +228,7 @@ extern int i;
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "i"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeaderNS)
@@ -247,6 +251,7 @@ namespace X
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "i"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeader_Alloc)
@@ -268,6 +273,7 @@ int i = 4;
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "i"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeaderNS_Alloc)
@@ -292,6 +298,7 @@ int X::i = 4;
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "i"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeader)
@@ -311,6 +318,7 @@ void f();
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "f"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeaderNS)
@@ -333,6 +341,7 @@ namespace X
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "f"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeader_Defined)
@@ -354,6 +363,7 @@ void f() { return; }
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "f"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeaderNS_Defined)
@@ -378,6 +388,7 @@ void X::f() { return; }
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "f"));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleTypedef)
@@ -400,7 +411,7 @@ typedef long U;
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "T"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "U", 4, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "U", 4, 14));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleTypedefInNS)
@@ -426,7 +437,7 @@ typedef X::T U;
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "T"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "U", 4, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "U", 4, 14));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleVariable)
@@ -449,7 +460,7 @@ static long l = 8;
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "i"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleVariableInNS)
@@ -475,7 +486,7 @@ static long l = 8;
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "i"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleVariable_Alloc)
@@ -499,7 +510,7 @@ static long l = 8;
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "i"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 5, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 5, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal,
@@ -527,7 +538,7 @@ static long l = 8;
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "i"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 5, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 5, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleFunction)
@@ -550,7 +561,7 @@ static void g();
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "f"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 4, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 4, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleFunctionInNS)
@@ -576,7 +587,7 @@ static void g();
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "f"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 4, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 4, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleFunction_Defined)
@@ -601,7 +612,7 @@ static int g() { return 2; }
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "f"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 6, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 6, 12));
 }
 
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal,
@@ -630,7 +641,36 @@ static int g() { return 4; }
 
     ASSERT_EQ(R.size(), 1);
     ASSERT_FALSE(nameMatched(R, "f"));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 6, 1));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "g", 6, 12));
+}
+
+TEST(MatchProblematicDeclarations_WithHeaders_AndALocal,
+     SingleFunction_TypesInNS)
+{
+    FileMap map = {
+        {"header.h", R"FILE(
+namespace X
+{
+    typedef int I;
+    typedef long L;
+}
+)FILE"},
+
+        {"main.cpp", R"FILE(
+#include "header.h"
+
+static void d(X::I i, X::L l) {}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 1);
+    ASSERT_FALSE(nameMatched(R, "I"));
+    ASSERT_FALSE(nameMatched(R, "L"));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "d", 4, 13));
 }
 
 TEST(MatchProblematicDeclarations_WithForwardDecl, Function)
@@ -657,6 +697,56 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
-    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 5));
-    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 9, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 10));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 9, 10));
+}
+
+TEST(MatchProblematicDeclarations_InInnerScope, Typedef)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+typedef int I;
+
+int main()
+{
+    typedef long L;
+    I i = 2;
+    L l = i * 2;
+    return l;
+}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 2);
+    ASSERT_FALSE(nameMatched(R, "L"));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "I", 2, 13));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "I", 7, 5));
+}
+
+TEST(MatchProblematicDeclarations_InInnerScope, Record)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+int main()
+{
+    struct S { int x; };
+
+    S s;
+    s.x = 2;
+    return s.x;
+}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 0);
+    ASSERT_FALSE(nameMatched(R, "s"));
+    ASSERT_FALSE(nameMatched(R, "x"));
 }

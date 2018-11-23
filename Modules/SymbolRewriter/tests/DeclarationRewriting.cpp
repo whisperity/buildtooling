@@ -16,7 +16,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_EQ(getReplacementAt(R, 4, 5), "main_MyIntType");
+    ASSERT_EQ(getReplacementAt(R, 4, 17), "main_MyIntType");
 }
 
 TEST(DeclarationRewriting, SimpleFunction)
@@ -25,7 +25,7 @@ TEST(DeclarationRewriting, SimpleFunction)
         {"main.cpp", R"FILE(
 namespace
 {
-    long f() {}
+    long f() { return 0; }
 }
 )FILE"}
     };
@@ -35,7 +35,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_EQ(getReplacementAt(R, 4, 5), "main_f");
+    ASSERT_EQ(getReplacementAt(R, 4, 10), "main_f");
 }
 
 TEST(DeclarationRewriting_AnotherFilename, SimpleFunction)
@@ -44,7 +44,7 @@ TEST(DeclarationRewriting_AnotherFilename, SimpleFunction)
         {"foo.cpp", R"FILE(
 namespace
 {
-    long f() {}
+    long f() { return 0; }
 }
 )FILE"}
     };
@@ -54,7 +54,7 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
-    ASSERT_EQ(getReplacementAt(R, 4, 5), "foo_f");
+    ASSERT_EQ(getReplacementAt(R, 4, 10), "foo_f");
 }
 
 TEST(DeclarationRewriting, SimpleFunctionWithPrototype)
@@ -81,6 +81,6 @@ namespace
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
-    ASSERT_EQ(getReplacementAt(R, 4, 5), "main_l");
-    ASSERT_EQ(getReplacementAt(R, 9, 5), "main_l");
+    ASSERT_EQ(getReplacementAt(R, 4, 10), "main_l");
+    ASSERT_EQ(getReplacementAt(R, 9, 10), "main_l");
 }
