@@ -40,4 +40,11 @@ bool nameMatched(
                    FileReplaceDirectives::ReplacementPair>& RMap,
     std::string Name);
 
+bool nameMatchedAtPosition(
+    const std::map<FileReplaceDirectives::Position,
+                   FileReplaceDirectives::ReplacementPair>& RMap,
+    std::string Name,
+    size_t Line,
+    size_t Col);
+
 #endif // SYMBOLREWRITER_TEST_H

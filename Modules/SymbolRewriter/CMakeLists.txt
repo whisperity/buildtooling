@@ -35,7 +35,8 @@ list(APPEND LLVM_LIBRARIES_USED
 
 add_library(RewritingTool STATIC
     Executor.cpp
-    TheFinder.cpp Replacement.cpp Replacement.h)
+    Replacement.cpp
+    TheFinder.cpp)
 
 add_executable(SymbolRewriter
     main.cpp)

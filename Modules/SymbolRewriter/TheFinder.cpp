@@ -36,7 +36,7 @@ public:
 
         const std::string& DeclName = ND->getName().str();
         PresumedLoc PLoc =
-            Result.SourceManager->getPresumedLoc(ND->getBeginLoc(), false);
+            Result.SourceManager->getPresumedLoc(ND->getLocStart(), false);
 
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
         assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
@@ -102,6 +102,7 @@ private:
  * expanded in the main file - i.e. they aren't in the TU because they are in
  * an included header.
  */
+// FIXME: This does not capture records that are in the TU's global scope.
 auto LocalInTheTU = namedDecl(
     allOf(
         unless(hasExternalFormalLinkage()),

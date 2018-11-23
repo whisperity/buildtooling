@@ -60,9 +60,13 @@ FileReplaceDirectives::getReplacements() const
              FileReplaceDirectives::ReplacementPair> Ret;
 
     for (const Replacement& Rep : Replacements)
+    {
+        std::cerr << "[DUMP] Replacement at " << Rep.Line << ":" << Rep.Col
+                  << " is " << Rep.What << " -> " << "UNKNOWN" << std::endl;
         Ret.emplace(std::make_pair(Rep.Line, Rep.Col),
                     std::make_pair(Rep.What, "UNKNOWN"));
         // FIXME: The "unknown" should be an actual replacement!
+    }
 
     return Ret;
 }
