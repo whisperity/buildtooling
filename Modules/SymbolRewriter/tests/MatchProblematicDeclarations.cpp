@@ -750,3 +750,47 @@ int main()
     ASSERT_FALSE(nameMatched(R, "s"));
     ASSERT_FALSE(nameMatched(R, "x"));
 }
+
+TEST(MatchProblematicDeclarations_InnerScope, Lambda)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+int main()
+{
+    auto lambda = [](int i) { return 2 + i; };
+
+    return lambda(4);
+}
+)FILE"}
+    };
+
+    // The lambda's type and implementation does not have a visible name so
+    // it should not be renamed, neither the lambda ()'s variable.
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 0);
+}
+
+TEST(MatchProblematicDeclarations_InnerScope, GenericLambda)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+int main()
+{
+    auto lambda = [](auto&& i) { return 2 + i; };
+
+    return lambda(4);
+}
+)FILE"}
+    };
+
+    // The lambda's type and implementation does not have a visible name so
+    // it should not be renamed, neither the lambda ()'s variable.
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 0);
+}

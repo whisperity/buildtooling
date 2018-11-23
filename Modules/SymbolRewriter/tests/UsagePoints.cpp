@@ -277,3 +277,27 @@ static const    L* clp;
     ASSERT_EQ(getReplacementAt(R, 7, 17), "main_L");
     ASSERT_EQ(getReplacementAt(R, 7, 20), "main_clp");
 }
+
+TEST(RewriteUsagePoints, StaticGenericLambda)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+static auto lambda = [](auto&& i) { return 2 + i; };
+
+int main()
+{
+    return lambda(4);
+}
+)FILE"}
+    };
+
+    // The lambda's type does not have a visible name so it should not be
+    // renamed. Neither should the variable of the lambda's function.
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 2);
+    ASSERT_EQ(getReplacementAt(R, 2, 13), "main_lambda");
+    ASSERT_EQ(getReplacementAt(R, 6, 12), "main_lambda");
+}

@@ -31,14 +31,15 @@ auto LocalInTheTU = namedDecl(
  *
  * E.g. inner classes need not be matched, because if their outer class' name is
  * rewritten, the inner class can be properly referenced.
+ *
+ * @note Need to match every namespace because one can put a TU-local typedef
+ * or class into a non-anonymous namespace which is still visible only to that
+ * TU.
  */
 auto InSomeGlobalishScope = anyOf(
     hasParent(translationUnitDecl()),
-    hasParent(namespaceDecl()));      /* NOTE: Need to match every namespace
-                                       * because one can put a TU-local typedef
-                                       * or class into a non-anonymous namespace
-                                       * which is still visible only to that TU.
-                                       */
+    hasParent(namespaceDecl())
+);
 
 /**
  * Renaming such TU-Internal declarations is enough to break ambiguity.
@@ -63,10 +64,14 @@ public:
         auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
         assert(ND && "Something matched as `id` but it wasn't a `NamedDecl`?");
 
-        std::cout << "Matched problematic symbol " << ND->getDeclKindName()
-                  << ": " << ND->getName().str() << std::endl;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // If the declaration hasn't a name, it cannot be renamed.
+            return;
 
         const std::string& DeclName = ND->getName().str();
+        std::cout << "Matched problematic symbol " << ND->getDeclKindName()
+                  << ": " << DeclName << std::endl;
+
         PresumedLoc PLoc =
             Result.SourceManager->getPresumedLoc(ND->getLocation(), false);
 
@@ -161,6 +166,10 @@ private:
         if (Match.empty())
             return false;
 
+        if (!D->getDeclName().isIdentifier() || D->getName().str().empty())
+            // Identifiers without a name cannot be renamed.
+            return false;
+
         Replacements.AddReplacementPosition(
             PLoc.getLine(), PLoc.getColumn(), D->getName().str(), D);
 
@@ -177,6 +186,10 @@ private:
         assert(Replacements.getFilepath() == PLoc.getFilename() &&
                "The file name for the matched DeclRefExpr's location is not in "
                "the file where replacements take place.");
+
+        if (!DRE->getDecl()->getDeclName().isIdentifier())
+            // Identifiers without a name cannot be renamed.
+            return;
 
         Replacements.AddReplacementPosition(
             PLoc.getLine(),
@@ -228,9 +241,12 @@ MatcherFactory::MatcherFactory(const std::string& Filename,
     {
         auto ProblematicDeclUsages = {
             // These matchers match declaration references to problematic
-            // TU-local functions or variables.
-            declRefExpr(to(functionDecl(TUInternalTraits))),
-            declRefExpr(to(varDecl(TUInternalTraits)))
+            // TU-local functions or variables. This matches more than
+            // "TUInternalTraits", but there are certain cases (e.g. lambdas)
+            // where a parent matcher can't be used...
+            // (These extra cases are not considered valid later on.)
+            declRefExpr(to(functionDecl(LocalInTheTU))),
+            declRefExpr(to(varDecl(LocalInTheTU)))
         };
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);

@@ -45,10 +45,8 @@ std::vector<FileReplaceDirectives::Position>
 FileReplaceDirectives::getReplacementPositions() const
 {
     std::vector<std::pair<size_t, size_t>> Ret{};
-
     for (const Replacement& Rep : Replacements)
         Ret.emplace_back(Rep.Line, Rep.Col);
-
     return Ret;
 }
 
@@ -58,13 +56,20 @@ FileReplaceDirectives::getReplacements() const
 {
     std::map<FileReplaceDirectives::Position,
              FileReplaceDirectives::ReplacementPair> Ret;
-
     for (const Replacement& Rep : Replacements)
     {
         std::string ReplaceTo;
         auto It = Bindings.find(Rep.BindingID);
         if (It == Bindings.end())
-            ReplaceTo = Rep.What + "__Unknown";
+        {
+            // There can be cases where a position for replacement was marked
+            // but the targeted binding doesn't exist. Disregard these fake
+            // matches.
+            std::cerr << "Attempt to replace " << Rep.What << " bound to "
+                      << Rep.BindingID << " but this ID is not bound."
+                      << std::endl;
+            continue;
+        }
         else
             ReplaceTo = It->second.second;
 
@@ -72,9 +77,7 @@ FileReplaceDirectives::getReplacements() const
                   << " is " << Rep.What << " -> " << ReplaceTo << std::endl;
         Ret.emplace(std::make_pair(Rep.Line, Rep.Col),
                     std::make_pair(Rep.What, ReplaceTo));
-        // FIXME: The "unknown" should be an actual replacement!
     }
-
     return Ret;
 }
 
