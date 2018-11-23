@@ -68,6 +68,19 @@ bool nameMatchedAtPosition(
     return It->second.first == Name;
 }
 
+std::string getReplacementAt(
+    const std::map<FileReplaceDirectives::Position,
+                   FileReplaceDirectives::ReplacementPair>& RMap,
+    size_t Line,
+    size_t Col)
+{
+    auto It = RMap.find(std::make_pair(Line, Col));
+    if (It == RMap.end())
+        return std::string();
+
+    return It->second.second;
+}
+
 int main(int argc, const char** argv)
 {
     ::testing::InitGoogleTest(&argc, const_cast<char**>(argv));

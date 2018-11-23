@@ -61,10 +61,17 @@ FileReplaceDirectives::getReplacements() const
 
     for (const Replacement& Rep : Replacements)
     {
+        std::string ReplaceTo;
+        auto It = Bindings.find(Rep.BindingID);
+        if (It == Bindings.end())
+            ReplaceTo = Rep.What + "__Unknown";
+        else
+            ReplaceTo = It->second.second;
+
         std::cerr << "[DUMP] Replacement at " << Rep.Line << ":" << Rep.Col
-                  << " is " << Rep.What << " -> " << "UNKNOWN" << std::endl;
+                  << " is " << Rep.What << " -> " << ReplaceTo << std::endl;
         Ret.emplace(std::make_pair(Rep.Line, Rep.Col),
-                    std::make_pair(Rep.What, "UNKNOWN"));
+                    std::make_pair(Rep.What, ReplaceTo));
         // FIXME: The "unknown" should be an actual replacement!
     }
 

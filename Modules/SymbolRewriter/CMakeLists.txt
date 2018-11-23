@@ -52,6 +52,7 @@ include_directories(SYSTEM
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_executable(RewriteTest
     Test.cpp
+    tests/DeclarationRewriting.cpp
     tests/MatchProblematicDeclarations.cpp)
 target_link_libraries(RewriteTest
     RewritingTool

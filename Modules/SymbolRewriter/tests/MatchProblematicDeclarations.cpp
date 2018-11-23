@@ -632,3 +632,31 @@ static int g() { return 4; }
     ASSERT_FALSE(nameMatched(R, "f"));
     ASSERT_TRUE(nameMatchedAtPosition(R, "g", 6, 1));
 }
+
+TEST(MatchProblematicDeclarations_WithForwardDecl, Function)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+namespace
+{
+    long l();
+}
+
+namespace
+{
+    long l()
+    {
+        return 4;
+    }
+}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 2);
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 4, 5));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "l", 9, 5));
+}
