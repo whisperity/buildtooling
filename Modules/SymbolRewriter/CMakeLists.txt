@@ -42,7 +42,8 @@ add_executable(SymbolRewriter
     main.cpp)
 target_link_libraries(SymbolRewriter
     RewritingTool
-    ${LLVM_LIBRARIES_USED})
+    ${LLVM_LIBRARIES_USED}
+    pthread)
 
 enable_testing()
 find_package(GTest)

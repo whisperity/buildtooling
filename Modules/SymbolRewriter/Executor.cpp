@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <utility>
 
 #include <clang/Tooling/CompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
@@ -15,6 +16,25 @@ using namespace llvm::sys::path;
 
 namespace SymbolRewriter
 {
+
+ToolExecution::ToolExecution(clang::tooling::CompilationDatabase& CompDb,
+                             std::string Filename)
+    : Compilations(CompDb)
+    , Filename(std::move(Filename))
+{
+}
+
+ToolResult ToolExecution::Execute()
+{
+    assert(!Executed && "Execute called multiple times on the job!");
+    Executed = true;
+    return ExecuteTool(Compilations, Filename);
+}
+
+const std::string& ToolExecution::filename() const
+{
+    return Filename;
+}
 
 ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
                        const std::string& Filename)
