@@ -76,22 +76,69 @@ public:
                                  *Result.SourceManager);
         if (Item->first == "declRefExpr")
             return HandleDeclRefExpr(
-                Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"));
+                Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"),
+                *Result.SourceManager);
     }
 
 private:
     void HandleTypeLoc(const TypeLoc* Loc, const SourceManager& SM)
     {
         std::cout << "Matched mention of problematic type symbol starting at "
-                  << std::endl
                   << Loc->getSourceRange().getBegin().printToString(SM)
                   << std::endl;
+
+        PresumedLoc PLoc = SM.getPresumedLoc(Loc->getLocStart(), false);
+        assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
+                                 "TypeLoc.");
+        assert(Replacements.getFilepath() == PLoc.getFilename() &&
+               "The file name for the matched TypeLoc's location is not in the "
+               "file where replacements take place.");
+
+        // Try different kinds of type location usages.
+        {
+            auto TypedefLoc = Loc->getAs<TypedefTypeLoc>();
+            if (!TypedefLoc.isNull())
+            {
+                // In this case, the binding is the typedef that got used.
+                Replacements.AddReplacementPosition(
+                    PLoc.getLine(),
+                    PLoc.getColumn(),
+                    TypedefLoc.getTypedefNameDecl()->getName().str(),
+                    TypedefLoc.getTypedefNameDecl());
+                return;
+            }
+        }
+        {
+            auto RecordLoc = Loc->getAs<RecordTypeLoc>();
+            if (!RecordLoc.isNull())
+            {
+                // In this case, the binding is the record type that got used.
+                Replacements.AddReplacementPosition(
+                    PLoc.getLine(),
+                    PLoc.getColumn(),
+                    RecordLoc.getDecl()->getName().str(),
+                    RecordLoc.getDecl());
+                return;
+            }
+        }
     }
 
-    void HandleDeclRefExpr(const DeclRefExpr* DRE)
+    void HandleDeclRefExpr(const DeclRefExpr* DRE, const SourceManager& SM)
     {
         std::cout << "Matched usage of problematic symbol in:" << std::endl;
         DRE->dumpColor();
+        PresumedLoc PLoc = SM.getPresumedLoc(DRE->getLocStart(), false);
+        assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
+                                 "DeclRefExpr.");
+        assert(Replacements.getFilepath() == PLoc.getFilename() &&
+               "The file name for the matched DeclRefExpr's location is not in "
+               "the file where replacements take place.");
+
+        Replacements.AddReplacementPosition(
+            PLoc.getLine(),
+            PLoc.getColumn(),
+            DRE->getDecl()->getName().str(),
+            DRE->getDecl());
     }
 
     FileReplaceDirectives& Replacements;

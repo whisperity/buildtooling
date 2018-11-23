@@ -78,7 +78,7 @@ int main()
 
     ASSERT_EQ(R.size(), 2);
     ASSERT_EQ(getReplacementAt(R, 4, 5), "main_f");
-    ASSERT_EQ(getReplacementAt(R, 14, 12), "main_f");
+    ASSERT_EQ(getReplacementAt(R, 12, 12), "main_f");
 }
 
 TEST(RewriteUsagePoints, FunctionCallWithLocalType)
@@ -108,8 +108,8 @@ int main()
 
     ASSERT_EQ(R.size(), 4);
     ASSERT_EQ(getReplacementAt(R, 2, 1), "main_I");
-    ASSERT_EQ(getReplacementAt(R, 4, 5), "main_I");
-    ASSERT_EQ(getReplacementAt(R, 4, 7), "main_f");
+    ASSERT_EQ(getReplacementAt(R, 6, 5), "main_I");
+    ASSERT_EQ(getReplacementAt(R, 6, 5), "main_f"); // Function reported to same place breaks map.
     ASSERT_EQ(getReplacementAt(R, 14, 12), "main_f");
 }
 
@@ -146,11 +146,36 @@ static void f(I i, L l, I& ir, L& lr, I* ip, L* lp, I** ipp,
     ASSERT_EQ(getReplacementAt(R, 10, 32), "main_L");
     ASSERT_EQ(getReplacementAt(R, 10, 39), "main_I");
     ASSERT_EQ(getReplacementAt(R, 10, 46), "main_L");
-    ASSERT_EQ(getReplacementAt(R, 10, 51), "main_I");
+    ASSERT_EQ(getReplacementAt(R, 10, 53), "main_I");
 
     ASSERT_EQ(getReplacementAt(R, 11, 15), "main_S");
     ASSERT_EQ(getReplacementAt(R, 11, 20), "main_S");
     ASSERT_EQ(getReplacementAt(R, 11, 27), "main_S");
     ASSERT_EQ(getReplacementAt(R, 11, 34), "main_S");
-    ASSERT_EQ(getReplacementAt(R, 11, 43), "main_S");
+    ASSERT_EQ(getReplacementAt(R, 11, 43), "main_S"); // Why not found?
+}
+
+TEST(RewriteUsagePoints, Variable)
+{
+    FileMap map = {
+        {"main.cpp", R"FILE(
+namespace
+{
+    long l = 42l;
+}
+
+int main()
+{
+    return l;
+}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 2);
+    ASSERT_EQ(getReplacementAt(R, 4, 5), "main_l");
+    ASSERT_EQ(getReplacementAt(R, 9, 12), "main_l");
 }
