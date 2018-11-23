@@ -69,22 +69,33 @@ public:
             return;
 
         const std::string& DeclName = ND->getName().str();
-        std::cout << "Matched problematic symbol " << ND->getDeclKindName()
-                  << ": " << DeclName << std::endl;
+        /*std::cout << "Matched problematic symbol " << ND->getDeclKindName()
+                  << ": " << DeclName << std::endl;*/
 
-        PresumedLoc PLoc =
-            Result.SourceManager->getPresumedLoc(ND->getLocation(), false);
+        const SourceLocation& Loc = Result.SourceManager->getSpellingLoc(
+            ND->getLocation());
+        std::string Filename = Result.SourceManager->getFilename(Loc);
+        size_t Line = Result.SourceManager->getSpellingLineNumber(Loc);
+        size_t Column = Result.SourceManager->getSpellingColumnNumber(Loc);
 
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
-        assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
+        assert(Loc.isValid() && "Invalid `SpellingLoc` got for a matched "
                                  "Decl.");
-        assert(Replacements.getFilepath() == PLoc.getFilename() &&
+        if (Replacements.getFilepath() != Filename)
+        {
+            std::cout << "Stored file path " << Replacements.getFilepath()
+                      << std::endl << "Spelling location's filename: "
+                      << Filename << std::endl;
+            std::cerr << "MISMATCH IN FILENAMES!" << std::endl;
+            return;
+        }
+        assert(Replacements.getFilepath() == Filename &&
                "The file name for the matched Decl's location is not in the "
                "file where replacements take place.");
 
         Replacements.AddReplacementPosition(
-            PLoc.getLine(),
-            PLoc.getColumn(),
+            Line,
+            Column,
             DeclName,
             ND);
     }
@@ -115,30 +126,41 @@ public:
             return HandleDeclRefExpr(
                 Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"),
                 *Result.SourceManager);
+
+        assert(std::string("Should not have reached this point!").empty());
     }
 
 private:
     void HandleTypeLoc(const TypeLoc* Loc, const SourceManager& SM)
     {
-        std::cout << "Matched mention of problematic type symbol starting at "
+        /*std::cout << "Matched mention of problematic type symbol starting at "
                   << Loc->getSourceRange().getBegin().printToString(SM)
-                  << std::endl;
+                  << std::endl;*/
 
-        PresumedLoc PLoc = SM.getPresumedLoc(Loc->getLocStart(), false);
-        assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
+        const SourceLocation& SLoc = SM.getSpellingLoc(Loc->getLocStart());
+        std::string Filename = SM.getFilename(SLoc);
+        assert(SLoc.isValid() && "Invalid `SpellingLoc` got for a matched "
                                  "TypeLoc.");
-        assert(Replacements.getFilepath() == PLoc.getFilename() &&
+        if (Replacements.getFilepath() != Filename)
+        {
+            std::cout << "Stored file path " << Replacements.getFilepath()
+                      << std::endl << "Spelling location's filename: "
+                      << Filename << std::endl;
+            std::cerr << "MISMATCH IN FILENAMES!" << std::endl;
+            return;
+        }
+        assert(Replacements.getFilepath() == Filename &&
                "The file name for the matched TypeLoc's location is not in the "
                "file where replacements take place.");
 
         const Type* Type = Loc->getTypePtr();
         // Try different kinds of type location usages.
         if (HandleDeclForTypeLoc<TypedefNameDecl>(
-            Type->getAsAdjusted<TypedefType>(), PLoc))
+            Type->getAsAdjusted<TypedefType>(), SM, SLoc))
             return;
 
         if (HandleDeclForTypeLoc<RecordDecl>(
-                Type->getAsAdjusted<RecordType>(), PLoc))
+            Type->getAsAdjusted<RecordType>(), SM, SLoc))
             return;
 
         // It's not directly a problem if a TypeLoc was matched that does not
@@ -147,12 +169,14 @@ private:
 
     /**
      * Helper function that matches on a Type's declaration and adds a rewrite
-     * to the TypeLoc at the file position PLoc if certain criteria (such as
+     * to the TypeLoc at the file position SLoc if certain criteria (such as
      * the referred Decl being in the local translation unit's global scope,
      * not coming from an externally nameable namespace) match.
      */
     template <typename DeclT, typename TypeT>
-    bool HandleDeclForTypeLoc(const TypeT* Ty, const PresumedLoc& PLoc)
+    bool HandleDeclForTypeLoc(const TypeT* Ty,
+                              const SourceManager& SM,
+                              const SourceLocation& SLoc)
     {
         if (!Ty)
             return false;
@@ -171,19 +195,34 @@ private:
             return false;
 
         Replacements.AddReplacementPosition(
-            PLoc.getLine(), PLoc.getColumn(), D->getName().str(), D);
+            SM.getSpellingLineNumber(SLoc),
+            SM.getSpellingColumnNumber(SLoc),
+            D->getName().str(),
+            D);
 
         return true;
     }
 
     void HandleDeclRefExpr(const DeclRefExpr* DRE, const SourceManager& SM)
     {
-        std::cout << "Matched usage of problematic symbol in:" << std::endl;
-        DRE->dumpColor();
-        PresumedLoc PLoc = SM.getPresumedLoc(DRE->getLocStart(), false);
-        assert(PLoc.isValid() && "Invalid `PresumedLoc` got for a matched "
-                                 "DeclRefExpr.");
-        assert(Replacements.getFilepath() == PLoc.getFilename() &&
+        /*std::cout << "Matched usage of problematic symbol in:" << std::endl;
+        DRE->dumpColor();*/
+
+        const SourceLocation& Loc = SM.getSpellingLoc(DRE->getLocation());
+        std::string Filename = SM.getFilename(Loc);
+        size_t Line = SM.getSpellingLineNumber(Loc);
+        size_t Column = SM.getSpellingColumnNumber(Loc);
+        assert(Loc.isValid() && "Invalid `SpellingLoc` got for a matched "
+                                "DeclRefExpr.");
+        if (Replacements.getFilepath() != Filename)
+        {
+            std::cout << "Stored file path " << Replacements.getFilepath()
+                      << std::endl << "Spelling location's filename: "
+                      << Filename << std::endl;
+            std::cerr << "MISMATCH IN FILENAMES!" << std::endl;
+            return;
+        }
+        assert(Replacements.getFilepath() == Filename &&
                "The file name for the matched DeclRefExpr's location is not in "
                "the file where replacements take place.");
 
@@ -192,8 +231,8 @@ private:
             return;
 
         Replacements.AddReplacementPosition(
-            PLoc.getLine(),
-            PLoc.getColumn(),
+            Line,
+            Column,
             DRE->getDecl()->getName().str(),
             DRE->getDecl());
     }

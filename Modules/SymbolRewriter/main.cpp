@@ -58,6 +58,17 @@ int main(int argc, const char** argv)
     for (const std::string& File : CompDb->getAllFiles())
     {
         // QUESTION: It would be nice if this thing ran parallel.
-        ExecuteTool(*CompDb, File);
+        auto ToolResult = ExecuteTool(*CompDb, File);
+        if (int* RetCode = std::get_if<int>(&ToolResult))
+        {
+            std::cerr << "Error! Non-zero return code from Clang on file "
+            << File << ": " << *RetCode << std::endl;
+            continue;
+        }
+
+        auto Results = std::move(
+            std::get<std::unique_ptr<FileReplaceDirectives>>(ToolResult));
+
+        Results->getReplacements();
     }
 }

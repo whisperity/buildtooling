@@ -17,8 +17,8 @@ FileReplaceDirectives::FileReplaceDirectives(std::string Filepath,
 void FileReplaceDirectives::SetReplacementBinding(std::string From,
                                                   const void* BindingID)
 {
-    std::cout << "Replacing for node " << BindingID << " set from " << From
-              << std::endl;
+    /*std::cout << "Replacing for node " << BindingID << " set from " << From
+              << std::endl;*/
 
     ReplacementPair Replacement{From, RewritePrefix + "_" + From};
     Bindings.emplace(BindingID, std::move(Replacement));
@@ -29,9 +29,9 @@ void FileReplaceDirectives::AddReplacementPosition(size_t AtLine,
                                                    std::string OfWhat,
                                                    const void* BindingID)
 {
-    std::cout << "Added a replacement location in the file at " << AtLine <<
+    /*std::cout << "Added a replacement location in the file at " << AtLine <<
               ":" << AtCol << " for string " << OfWhat << " bound to binding "
-              << BindingID << std::endl;
+              << BindingID << std::endl;*/
 
     Replacements.emplace_back(AtLine, AtCol, OfWhat, BindingID);
 }
