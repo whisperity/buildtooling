@@ -90,6 +90,13 @@ private:
 
 };
 
+/**
+ * Write the replacements formatted to the given output stream. This output
+ * can be machine-read.
+ */
+void writeReplacementOutput(std::ostream& Output,
+                            const FileReplaceDirectives& Directives);
+
 } // namespace SymbolRewriter
 
 #endif // SYMBOLREWRITER_REPLACEMENT_H

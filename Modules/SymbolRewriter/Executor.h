@@ -48,13 +48,16 @@ public:
     // TODO: enable_unique_from_this? ;)
     ToolResult Execute();
 
-    const std::string& filename() const;
+    const std::string& filepath() const;
+    std::string filepathWithoutExtension() const;
+    std::string filename() const;
+    std::string extension() const;
 
 private:
     bool Executed = false;
 
     clang::tooling::CompilationDatabase& Compilations;
-    std::string Filename;
+    std::string Filepath;
 };
 
 /**
@@ -64,7 +67,7 @@ private:
  * @returns The result status of ClangTool#run().
  */
 ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
-                       const std::string& Filename);
+                       const std::string& Filepath);
 
 /**
  * Execute the rewriting collector tool's on the given file map (path to content

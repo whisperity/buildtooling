@@ -55,6 +55,7 @@ add_executable(RewriteTest
     Test.cpp
     tests/DeclarationRewriting.cpp
     tests/MatchProblematicDeclarations.cpp
+    tests/RenameWriting.cpp
     tests/UsagePoints.cpp)
 target_link_libraries(RewriteTest
     RewritingTool

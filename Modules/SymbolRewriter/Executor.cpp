@@ -18,9 +18,9 @@ namespace SymbolRewriter
 {
 
 ToolExecution::ToolExecution(clang::tooling::CompilationDatabase& CompDb,
-                             std::string Filename)
+                             std::string Filepath)
     : Compilations(CompDb)
-    , Filename(std::move(Filename))
+    , Filepath(std::move(Filepath))
 {
 }
 
@@ -28,24 +28,45 @@ ToolResult ToolExecution::Execute()
 {
     assert(!Executed && "Execute called multiple times on the job!");
     Executed = true;
-    return ExecuteTool(Compilations, Filename);
+    return ExecuteTool(Compilations, Filepath);
 }
 
-const std::string& ToolExecution::filename() const
+const std::string& ToolExecution::filepath() const
 {
-    return Filename;
+    return Filepath;
+}
+
+std::string ToolExecution::filepathWithoutExtension() const
+{
+    std::string Path = Filepath;
+    const std::string& Extension = extension();
+    auto It = Path.find(Extension);
+    if (It != std::string::npos)
+        Path.replace(It, Extension.length(), "");
+
+    return Path;
+}
+
+std::string ToolExecution::filename() const
+{
+    return stem(Filepath);
+}
+
+std::string ToolExecution::extension() const
+{
+    return ::extension(Filepath);
 }
 
 ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
-                       const std::string& Filename)
+                       const std::string& Filepath)
 {
-    ClangTool Tool(CompDb, {Filename});
-    std::cout << "Running for '" << Filename << "'" << std::endl;
+    ClangTool Tool(CompDb, {Filepath});
+    std::cout << "Running for '" << Filepath << "'" << std::endl;
 
     auto Replacements = std::make_unique<FileReplaceDirectives>(
-        Filename, stem(Filename));
+        Filepath, stem(Filepath));
 
-    MatcherFactory Factory{Filename, *Replacements};
+    MatcherFactory Factory{Filepath, *Replacements};
 
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
     std::cout << "Result code: " << Result << std::endl;

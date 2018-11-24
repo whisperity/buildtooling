@@ -91,4 +91,17 @@ FileReplaceDirectives::Replacement::Replacement(size_t Line,
     , What(std::move(What))
 {}
 
+void writeReplacementOutput(std::ostream& Output,
+                            const FileReplaceDirectives& Directives)
+{
+    const std::string& FP = Directives.getFilepath();
+
+    for (const auto& E : Directives.getReplacements())
+    {
+        Output << FP << "##"
+            << E.first.first << ":" << E.first.second << "##"
+            << E.second.first << "##" << E.second.second << '\n';
+    }
+}
+
 } // namespace SymbolRewriter

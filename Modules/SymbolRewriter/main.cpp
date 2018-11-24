@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -15,10 +16,15 @@ using namespace llvm::sys::fs;
 using namespace SymbolRewriter;
 using namespace whisperity;
 
+/**
+ * TODO: Document the whole tool.
+ */
 int main(int argc, const char** argv)
 {
     if (argc < 2 || argc > 4)
     {
+        // TODO: The output for "implements" is not used.
+        // FIXME: Noone says anything about the threadcount argument.
         std::cerr << "usage: " << argv[0] <<
                   " <build folder> [output for 'implements' relation]" <<
                   std::endl;
@@ -72,15 +78,25 @@ int main(int argc, const char** argv)
                           << std::endl;
                 return;
             }
-
             auto Results = std::move(
                 std::get<std::unique_ptr<FileReplaceDirectives>>(ToolResult));
 
-            // TODO: Save these somewhere, somehow...
-            Results->getReplacements();
+
+            std::string ReplacementFile = Execution.filepathWithoutExtension()
+                .append(Execution.extension()).append("-symbols.txt");
+            std::cout << "Writing output to " << ReplacementFile << std::endl;
+            std::ofstream Output{ReplacementFile};
+            if (Output.fail())
+            {
+                std::cerr << "Can't write output for '" << Execution.filepath()
+                          << "' to file '" << ReplacementFile
+                          << "' because the file never opened." << std::endl;
+                return;
+            }
+            writeReplacementOutput(Output, *Results);
         });
 
-    // ----------------------- Execute the FrontendAction ----------------------
+    // ---------------------- Execute the FrontendActions ----------------------
     for (const std::string& File : CompDb->getAllFiles())
         Threading->enqueue(ToolExecution(*CompDb, File));
 
