@@ -26,7 +26,7 @@ ToolExecution::ToolExecution(clang::tooling::CompilationDatabase& CompDb,
 
 ToolResult ToolExecution::operator()()
 {
-    assert(!Executed && "Execute called multiple times on the job!");
+    assert(!Executed && "Execute called multiple times on the same job!");
     Executed = true;
     return ExecuteTool(Compilations, Filepath);
 }
@@ -61,18 +61,18 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
                        const std::string& Filepath)
 {
     ClangTool Tool(CompDb, {Filepath});
-    std::cout << "Running for '" << Filepath << "'" << std::endl;
-
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         Filepath, stem(Filepath));
-
     MatcherFactory Factory{Filepath, *Replacements};
 
+    std::cout << "Running for '" << Filepath << "'..." << std::endl;
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
-    std::cout << "Result code: " << Result << std::endl;
-
     if (Result)
+    {
+        std::cerr << "Non-zero result code " << Result
+                  << " for " << Filepath << std::endl;
         return Result;
+    }
     return std::move(Replacements);
 }
 
@@ -106,17 +106,18 @@ ToolResult ExecuteTool(const FileMap& FileMap,
     ClangTool Tool(*CompDb, {SourceName});
     for (const auto& e : FileMap)
         Tool.mapVirtualFile(e.first, e.second);
-    std::cout << "Running for '" << SourceName << "'" << std::endl;
-
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         SourceName, stem(SourceName));
     MatcherFactory Factory{SourceName, *Replacements};
 
+    std::cout << "Running for '" << SourceName << "'..." << std::endl;
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
-    std::cout << "Result code: " << Result << std::endl;
-
     if (Result)
+    {
+        std::cerr << "Non-zero result code " << Result
+                  << " for " << SourceName << std::endl;
         return Result;
+    }
     return std::move(Replacements);
 }
 

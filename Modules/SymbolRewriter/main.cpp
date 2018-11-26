@@ -90,7 +90,6 @@ int main(int argc, const char** argv)
 
             std::string ReplacementFile = Execution.filepathWithoutExtension()
                 .append(Execution.extension()).append("-symbols.txt");
-            std::cout << "Writing output to " << ReplacementFile << std::endl;
             std::ofstream Output{ReplacementFile};
             if (Output.fail())
             {
