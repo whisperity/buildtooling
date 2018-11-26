@@ -1,7 +1,8 @@
+import codecs
 import os
 import subprocess
 import sys
-from itertools import filterfalse, tee
+from itertools import filterfalse, islice, tee
 
 __all__ = ['progress_bar', 'graph_visualisation']
 
@@ -43,13 +44,55 @@ def call_process(command, args=None, **kwargs):
     p = subprocess.run([command] + args,
                        check=True,
                        **kwargs)
-    return True, '', p.stdout.decode('utf-8')
+    return True, '', p.stdout.decode('utf-8') if p.stdout else ''
   except subprocess.CalledProcessError as e:
     print("Error! The call did not succeed, because\n%s" % str(e),
           file=sys.stderr)
-    return False, str(e), e.stdout.decode('utf-8')
+    return False, str(e), e.stdout.decode('utf-8') if e.stdout else ''
   except OSError as e:
     print("Error! The call did not succeed, because a system error:\n%s"
           % str(e),
           file=sys.stderr)
     return False, str(e), ''
+
+
+def replace_at_position(filename, line, col, from_str, to_str):
+  """
+  Replace the string starting in file :param filename: at line :param line: at
+  the character :param col: from :param from_str: to :param to_str:.
+
+  :param line: and :param col: are 1-based indices, not 0-based!
+
+  :return: True if the replacement took place, False otherwise.
+  """
+  try:
+    with codecs.open(filename, 'r+',
+                     encoding='utf-8', errors='replace') as handle:
+      lines = list(handle)
+      if len(lines) < line:
+        raise IndexError("The file does not contain a line with number %d"
+                         % line)
+      line_to_change = lines[line - 1]
+      if len(line_to_change) < col:
+        raise IndexError("The line %d at column %d is already over."
+                         % (line, col))
+
+      line_tail = line_to_change[col - 1:]
+      new_tail = line_tail.replace(from_str, to_str, 1)
+      if line_tail == new_tail:
+        raise KeyError("The replacement at the given position did not match "
+                       "the given string that were to be replaced.")
+
+      new_line = line_to_change[:col - 1] + new_tail
+      lines[line - 1] = new_line
+
+      handle.seek(0)
+      handle.truncate(0)
+      handle.write(''.join(lines))
+
+      return True
+  except Exception as e:
+    print("Couldn't do replacement in '%s' (%d:%d) '%s' -> '%s' because %s: %s"
+          % (filename, line, col, from_str, to_str, str(type(e)), str(e)),
+          file=sys.stderr)
+    return False
