@@ -69,9 +69,6 @@ public:
             return;
 
         const std::string& DeclName = ND->getName().str();
-        /*std::cout << "Matched problematic symbol " << ND->getDeclKindName()
-                  << ": " << DeclName << std::endl;*/
-
         const SourceLocation& Loc = Result.SourceManager->getSpellingLoc(
             ND->getLocation());
         std::string Filename = Result.SourceManager->getFilename(Loc);
@@ -79,19 +76,10 @@ public:
         size_t Column = Result.SourceManager->getSpellingColumnNumber(Loc);
 
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
-        assert(Loc.isValid() && "Invalid `SpellingLoc` got for a matched "
-                                 "Decl.");
-        if (Replacements.getFilepath() != Filename)
-        {
-            std::cout << "Stored file path " << Replacements.getFilepath()
-                      << std::endl << "Spelling location's filename: "
-                      << Filename << std::endl;
-            std::cerr << "MISMATCH IN FILENAMES!" << std::endl;
+        if (Loc.isInvalid())
             return;
-        }
-        assert(Replacements.getFilepath() == Filename &&
-               "The file name for the matched Decl's location is not in the "
-               "file where replacements take place.");
+        if (Replacements.getFilepath() != Filename)
+            return;
 
         Replacements.AddReplacementPosition(
             Line,
@@ -133,25 +121,12 @@ public:
 private:
     void HandleTypeLoc(const TypeLoc* Loc, const SourceManager& SM)
     {
-        /*std::cout << "Matched mention of problematic type symbol starting at "
-                  << Loc->getSourceRange().getBegin().printToString(SM)
-                  << std::endl;*/
-
         const SourceLocation& SLoc = SM.getSpellingLoc(Loc->getLocStart());
         std::string Filename = SM.getFilename(SLoc);
-        assert(SLoc.isValid() && "Invalid `SpellingLoc` got for a matched "
-                                 "TypeLoc.");
-        if (Replacements.getFilepath() != Filename)
-        {
-            std::cout << "Stored file path " << Replacements.getFilepath()
-                      << std::endl << "Spelling location's filename: "
-                      << Filename << std::endl;
-            std::cerr << "MISMATCH IN FILENAMES!" << std::endl;
+        if (SLoc.isInvalid())
             return;
-        }
-        assert(Replacements.getFilepath() == Filename &&
-               "The file name for the matched TypeLoc's location is not in the "
-               "file where replacements take place.");
+        if (Replacements.getFilepath() != Filename)
+            return;
 
         const Type* Type = Loc->getTypePtr();
         // Try different kinds of type location usages.
@@ -205,26 +180,14 @@ private:
 
     void HandleDeclRefExpr(const DeclRefExpr* DRE, const SourceManager& SM)
     {
-        /*std::cout << "Matched usage of problematic symbol in:" << std::endl;
-        DRE->dumpColor();*/
-
         const SourceLocation& Loc = SM.getSpellingLoc(DRE->getLocation());
         std::string Filename = SM.getFilename(Loc);
         size_t Line = SM.getSpellingLineNumber(Loc);
         size_t Column = SM.getSpellingColumnNumber(Loc);
-        assert(Loc.isValid() && "Invalid `SpellingLoc` got for a matched "
-                                "DeclRefExpr.");
-        if (Replacements.getFilepath() != Filename)
-        {
-            std::cout << "Stored file path " << Replacements.getFilepath()
-                      << std::endl << "Spelling location's filename: "
-                      << Filename << std::endl;
-            std::cerr << "MISMATCH IN FILENAMES!" << std::endl;
+        if (Loc.isInvalid())
             return;
-        }
-        assert(Replacements.getFilepath() == Filename &&
-               "The file name for the matched DeclRefExpr's location is not in "
-               "the file where replacements take place.");
+        if (Replacements.getFilepath() != Filename)
+            return;
 
         if (!DRE->getDecl()->getDeclName().isIdentifier())
             // Identifiers without a name cannot be renamed.
