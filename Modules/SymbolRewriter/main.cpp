@@ -33,6 +33,12 @@ int main(int argc, const char** argv)
         return 2;
     }
 
+    if (argc >= 2 && strncmp(argv[1], "--version", 10) == 0)
+    {
+        std::cerr << "SymbolRewriter vX.Y.Z" << std::endl;
+        return 0;
+    }
+
     // ------------------- Configure the arguments' defaults -------------------
     const StringRef BuildFolder = argv[1];
 
@@ -70,7 +76,7 @@ int main(int argc, const char** argv)
     auto Threading = make_thread_pool<ToolExecution>(ThreadCount,
         [](auto& Execution)
         {
-            auto ToolResult = Execution.Execute();
+            auto ToolResult = Execution();
             if (int* RetCode = std::get_if<int>(&ToolResult))
             {
                 std::cerr << "Error! Non-zero return code from Clang on file "

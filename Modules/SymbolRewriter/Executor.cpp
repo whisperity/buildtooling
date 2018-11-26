@@ -24,7 +24,7 @@ ToolExecution::ToolExecution(clang::tooling::CompilationDatabase& CompDb,
 {
 }
 
-ToolResult ToolExecution::Execute()
+ToolResult ToolExecution::operator()()
 {
     assert(!Executed && "Execute called multiple times on the job!");
     Executed = true;

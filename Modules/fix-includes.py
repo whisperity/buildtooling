@@ -12,11 +12,20 @@ import os
 import re
 import sys
 
+from utils import call_process
 from utils.progress_bar import tqdm
 from ModulesTSMaker import *
 
 HEADER_FILE = re.compile(r'\.(H(XX|PP|\+\+)?|h(xx|pp|\+\+)?|t(xx|pp|\+\+))$')
 
+# ---------------------- Sanity check invocation of tool ----------------------
+
+if len(sys.argv) != 2:
+  print("Error: Please specify a 'compile_commands.json' file for the "
+        "project!", file=sys.stderr)
+  sys.exit(2)
+
+COMPILE_COMMAND_JSON = os.path.abspath(sys.argv[1])
 
 START_FOLDER = os.getcwd()
 if not os.path.isfile("CMakeLists.txt"):
@@ -24,17 +33,38 @@ if not os.path.isfile("CMakeLists.txt"):
         file=sys.stderr)
   sys.exit(2)
 
+SYMBOL_REWRITER_BINARY = 'SymbolRewriter'
+success, _, _ = call_process(SYMBOL_REWRITER_BINARY, ['--version'])
+if not success:
+  print("The 'SymbolRewriter' binary was not found in the PATH variable. "
+        "This tool is shipped with the Python script and is a required "
+        "dependency.",
+        file=sys.stderr)
+  sys.exit(2)
 
-# In the end after some heuristics, C++ files will be concatenated after one
+# ------------------------- Real execution begins now -------------------------
+
+# In the end, after some heuristics, C++ files will be concatenated after one
 # another into a "new TU" (of the module) which makes this new TU not compile
 # as it is, because, for example, there are types in the anonymous namespace
 # that conflict with a later file fragment.
-# QUESTION: How to do the original search and rewriting in one step?
-# TODO: Just simply rewrite the anonymous namespaces to a "filename" namespace
-# and then every other namespace using it should get a using block.
-pass
+success, _, output = call_process(SYMBOL_REWRITER_BINARY,
+                                  [os.path.dirname(COMPILE_COMMAND_JSON),
+                                   'TODO-UNUSED',  # TODO: What's this?
+                                   str(multiprocessing.cpu_count())],
+                                  cwd=START_FOLDER,
+                                  stdout=None)
+if not success:
+  print("Error: The renaming of symbols in implementation files failed!",
+        file=sys.stderr)
+  print("The tool's output was:", file=sys.stderr)
+  print(output, file=sys.stderr)
+  sys.exit(1)
+
+sys.exit(0)
 
 
+# Get the current pre-existing module mapping for the project.
 MODULEMAP, DUPLICATES = mapping.get_module_mapping(START_FOLDER)
 DEPENDENCY_MAP = mapping.DependencyMap(MODULEMAP)
 

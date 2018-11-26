@@ -45,27 +45,29 @@ target_link_libraries(SymbolRewriter
     ${LLVM_LIBRARIES_USED}
     pthread)
 
-enable_testing()
-find_package(GTest)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    enable_testing()
+    find_package(GTest)
 
-include_directories(SYSTEM
-    ${GTEST_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_executable(RewriteTest
-    Test.cpp
-    tests/DeclarationRewriting.cpp
-    tests/MatchProblematicDeclarations.cpp
-    tests/RenameWriting.cpp
-    tests/UsagePoints.cpp)
-target_link_libraries(RewriteTest
-    RewritingTool
-    ${GTEST_BOTH_LIBRARIES}
-    ${LLVM_LIBRARIES_USED}
-    pthread)
+    include_directories(SYSTEM
+        ${GTEST_INCLUDE_DIRS})
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+    add_executable(RewriteTest
+        Test.cpp
+        tests/DeclarationRewriting.cpp
+        tests/MatchProblematicDeclarations.cpp
+        tests/RenameWriting.cpp
+        tests/UsagePoints.cpp)
+    target_link_libraries(RewriteTest
+        RewritingTool
+        ${GTEST_BOTH_LIBRARIES}
+        ${LLVM_LIBRARIES_USED}
+        pthread)
 
-add_test(
-    NAME RewriteTest
-    COMMAND RewriteTest)
-add_custom_target(check
-    COMMAND ${CMAKE_CTEST_COMMAND}
-    DEPENDS RewriteTest)
+    add_test(
+        NAME RewriteTest
+        COMMAND RewriteTest)
+    add_custom_target(check
+        COMMAND ${CMAKE_CTEST_COMMAND}
+        DEPENDS RewriteTest)
+endif()

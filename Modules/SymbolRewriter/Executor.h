@@ -46,7 +46,7 @@ public:
      * @note A single ToolExecution should only be executed ONCE.
      */
     // TODO: enable_unique_from_this? ;)
-    ToolResult Execute();
+    ToolResult operator()();
 
     const std::string& filepath() const;
     std::string filepathWithoutExtension() const;
