@@ -35,6 +35,7 @@ list(APPEND LLVM_LIBRARIES_USED
 
 add_library(RewritingTool STATIC
     Executor.cpp
+    ImplementsEdges.cpp
     Replacement.cpp
     TheFinder.cpp)
 

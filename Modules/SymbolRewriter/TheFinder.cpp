@@ -4,6 +4,7 @@
 
 #include <clang/AST/DeclCXX.h>
 
+#include "ImplementsEdges.h"
 #include "Replacement.h"
 
 using namespace clang;
@@ -47,15 +48,16 @@ auto InSomeGlobalishScope = anyOf(
 auto TUInternalTraits = allOf(LocalInTheTU, InSomeGlobalishScope);
 
 /**
- * A match result callback class that handles the rewriting of problematic
- * declarations.
+ * A match result callback class that handles the renaming of problematically
+ * named declarations.
  */
 class HandleDeclarations
     : public MatchFinder::MatchCallback
 {
 
 public:
-    HandleDeclarations(FileReplaceDirectives& Replacements)
+    HandleDeclarations(FileReplaceDirectives& Replacements,
+                       ImplementsEdges&)
         : Replacements(Replacements)
     {}
 
@@ -100,7 +102,8 @@ class HandleUsagePoints
 {
 
 public:
-    HandleUsagePoints(FileReplaceDirectives& Replacements)
+    HandleUsagePoints(FileReplaceDirectives& Replacements,
+                      ImplementsEdges&)
         : Replacements(Replacements)
     {}
 
@@ -203,14 +206,33 @@ private:
     FileReplaceDirectives& Replacements;
 };
 
+class HandleFindingImplementsRelation
+    : public MatchFinder::MatchCallback
+{
+public:
+    HandleFindingImplementsRelation(FileReplaceDirectives&,
+                                    ImplementsEdges& Implementses)
+    {}
+
+    void run(const MatchFinder::MatchResult& Result) override
+    {
+        const auto Item = Result.Nodes.getMap().begin();
+        const auto* D = Result.Nodes.getNodeAs<Decl>("id");
+        D->dump();
+
+        //assert(std::string("Should not have reached this point!").empty());
+    }
+};
+
 } // namespace (anonymous)
 
 namespace SymbolRewriter
 {
 
-MatcherFactory::MatcherFactory(const std::string& Filename,
-                               FileReplaceDirectives& Replacements)
+MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
+                               ImplementsEdges& ImplementsEdges)
    : Replacements(Replacements)
+   , Implementses(ImplementsEdges)
 {
     // Create matchers for named declarations which are to be renamed.
     auto ProblematicNamedDeclarations = {
@@ -253,6 +275,9 @@ MatcherFactory::MatcherFactory(const std::string& Filename,
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);
     }
+
+    AddIDBoundMatcher<HandleFindingImplementsRelation>(
+        "id", decl()); // TODO: wip.
 }
 
 MatcherFactory::~MatcherFactory()
@@ -268,7 +293,7 @@ MatchFinder& MatcherFactory::operator()() { return TheFinder; }
 template <class Handler>
 MatchFinder::MatchCallback* MatcherFactory::CreateCallback()
 {
-    Callbacks.push_back(new Handler{this->Replacements});
+    Callbacks.push_back(new Handler{this->Replacements, this->Implementses});
     return Callbacks.back();
 }
 

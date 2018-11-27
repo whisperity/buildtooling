@@ -7,6 +7,7 @@
 #include <llvm/Support/FileSystem.h>
 
 #include "Executor.h"
+#include "ImplementsEdges.h"
 #include "Replacement.h"
 #include "threadpool.h"
 
@@ -76,7 +77,7 @@ int main(int argc, const char** argv)
     auto Threading = make_thread_pool<ToolExecution>(ThreadCount,
         [](auto& Execution)
         {
-            auto ToolResult = Execution();
+            ToolResult ToolResult = Execution();
             if (int* RetCode = std::get_if<int>(&ToolResult))
             {
                 std::cerr << "Error! Non-zero return code from Clang on file "
@@ -84,8 +85,7 @@ int main(int argc, const char** argv)
                           << std::endl;
                 return;
             }
-            auto Results = std::move(
-                std::get<std::unique_ptr<FileReplaceDirectives>>(ToolResult));
+            auto Results = std::get<UsefulResultType>(std::move(ToolResult));
 
 
             std::string ReplacementFile = Execution.filepathWithoutExtension()
@@ -98,7 +98,7 @@ int main(int argc, const char** argv)
                           << "' because the file never opened." << std::endl;
                 return;
             }
-            writeReplacementOutput(Output, *Results);
+            writeReplacementOutput(Output, *Results.first);
         });
 
     // ---------------------- Execute the FrontendActions ----------------------
