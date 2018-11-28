@@ -56,6 +56,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_executable(RewriteTest
         Test.cpp
         tests/DeclarationRewriting.cpp
+        tests/ImplementsWriting.cpp
         tests/MatchProblematicDeclarations.cpp
         tests/RenameWriting.cpp
         tests/UsagePoints.cpp)

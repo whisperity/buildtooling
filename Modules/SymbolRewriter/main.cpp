@@ -87,18 +87,37 @@ int main(int argc, const char** argv)
             }
             auto Results = std::get<UsefulResultType>(std::move(ToolResult));
 
-
-            std::string ReplacementFile = Execution.filepathWithoutExtension()
-                .append(Execution.extension()).append("-symbols.txt");
-            std::ofstream Output{ReplacementFile};
-            if (Output.fail())
             {
-                std::cerr << "Can't write output for '" << Execution.filepath()
-                          << "' to file '" << ReplacementFile
-                          << "' because the file never opened." << std::endl;
-                return;
+                std::string OutputFile =
+                    Execution.filepathWithoutExtension()
+                    .append(Execution.extension())
+                    .append("-symbols.txt");
+                std::ofstream OutputBuffer{OutputFile};
+                if (OutputBuffer.fail())
+                    std::cerr << "Can't write output for '"
+                              << Execution.filepath()
+                              << "' to file '" << OutputFile
+                              << "' because the file never opened."
+                              << std::endl;
+                else
+                    writeReplacementOutput(OutputBuffer, *Results.first);
             }
-            writeReplacementOutput(Output, *Results.first);
+
+            {
+                std::string OutputFile =
+                    Execution.filepathWithoutExtension()
+                        .append(Execution.extension())
+                        .append("-implements.txt");
+                std::ofstream OutputBuffer{OutputFile};
+                if (OutputBuffer.fail())
+                    std::cerr << "Can't write output for '"
+                              << Execution.filepath()
+                              << "' to file '" << OutputFile
+                              << "' because the file never opened."
+                              << std::endl;
+                else
+                    writeImplementsOutput(OutputBuffer, *Results.second);
+            }
         });
 
     // ---------------------- Execute the FrontendActions ----------------------

@@ -63,7 +63,7 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
     ClangTool Tool(CompDb, {Filepath});
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         Filepath, stem(Filepath));
-    auto Implementses = std::make_unique<ImplementsEdges>();
+    auto Implementses = std::make_unique<ImplementsEdges>(Filepath);
     MatcherFactory Factory{*Replacements, *Implementses};
 
     std::cout << "Running for '" << Filepath << "'..." << std::endl;
@@ -90,7 +90,6 @@ ToolResult ExecuteTool(const FileMap& FileMap,
 
     std::unique_ptr<FixedCompilationDatabase> CompDb;
     {
-        // HACK: Clang wants to int& to this...
         auto Argc = static_cast<int>(Argv.size());
         std::string LoadError;
         CompDb = FixedCompilationDatabase::loadFromCommandLine(
@@ -109,7 +108,7 @@ ToolResult ExecuteTool(const FileMap& FileMap,
         Tool.mapVirtualFile(e.first, e.second);
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         SourceName, stem(SourceName));
-    auto Implementses = std::make_unique<ImplementsEdges>();
+    auto Implementses = std::make_unique<ImplementsEdges>(SourceName);
     MatcherFactory Factory{*Replacements, *Implementses};
 
     std::cout << "Running for '" << SourceName << "'..." << std::endl;

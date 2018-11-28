@@ -1,6 +1,7 @@
 #ifndef SYMBOLREWRITER_REPLACEMENT_H
 #define SYMBOLREWRITER_REPLACEMENT_H
 
+#include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
