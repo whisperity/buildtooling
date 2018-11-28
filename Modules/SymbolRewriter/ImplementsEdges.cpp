@@ -29,8 +29,9 @@ void writeImplementsOutput(
     std::ostream& Output,
     const ImplementsEdges& Implementses)
 {
+    const std::string& FP = Implementses.getFilepath();
     for (const std::string& File : Implementses.getImplementedFiles())
-        Output << Implementses.getFilepath() << "##" << File << std::endl;
+        Output << FP << "##" << File << std::endl;
 }
 
 } // namespace SymbolRewriter

@@ -25,6 +25,14 @@ auto LocalInTheTU = namedDecl(
         isExpansionInMainFile()));
 
 /**
+ *
+ */
+auto ImplementedInTheTU = namedDecl(
+    allOf(
+        hasExternalFormalLinkage(),
+        isExpansionInMainFile()));
+
+/**
  * However, the previous matcher would also match things like a local variable
  * in a "static void f()". For this very reason, we only consider "things" that
  * are kinda global-y in the TU itself, i.e. they are in the truly global scope,
@@ -218,7 +226,7 @@ public:
     {
         const auto Item = Result.Nodes.getMap().begin();
         const auto* D = Result.Nodes.getNodeAs<Decl>("id");
-        D->dump();
+        //D->dump();
 
         //assert(std::string("Should not have reached this point!").empty());
     }
@@ -235,32 +243,27 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
    , Implementses(ImplementsEdges)
 {
     // Create matchers for named declarations which are to be renamed.
-    auto ProblematicNamedDeclarations = {
-        // Basically every name-able "top-level" thing.
-        functionDecl(TUInternalTraits),
-        varDecl(TUInternalTraits),
-        recordDecl(TUInternalTraits),
-        typedefNameDecl(TUInternalTraits)
-    };
-    for (auto Matcher : ProblematicNamedDeclarations)
-        AddIDBoundMatcher<HandleDeclarations>(Matcher);
+    {
+        auto ProblematicNamedDeclarations = {
+            // Basically every name-able "top-level" thing.
+            functionDecl(TUInternalTraits),
+            varDecl(TUInternalTraits),
+            recordDecl(TUInternalTraits),
+            typedefNameDecl(TUInternalTraits)
+        };
+        for (auto Matcher : ProblematicNamedDeclarations)
+            AddIDBoundMatcher<HandleDeclarations>(Matcher);
+    }
 
     // Add a matchers that will report the usage of such a named declaration.
     {
-        auto DeclaringToRecord = hasDeclaration(recordDecl(TUInternalTraits));
-        auto DeclaringToTypedef = hasDeclaration(
-            typedefNameDecl(TUInternalTraits));
-
-        auto ProblematicDeclUsages = {
-            // Match type locations that are in the main file.
-            // (This will match, e.g. for a "const T*&", the outer type
-            // const&, the inner type T*, and the innermost type T. In case this
-            // T is a problematic symbol, a match will eventually take care of
-            // it.
-            typeLoc(isExpansionInMainFile())
-        };
-        for (auto Matcher : ProblematicDeclUsages)
-            AddIDBoundMatcher<HandleUsagePoints>("typeLoc", Matcher);
+        // Match type locations that are in the main file.
+        // (This will match, e.g. for a "const T*&", the outer type
+        // const&, the inner type T*, and the innermost type T. In case this
+        // T is a problematic symbol, a match will eventually take care of
+        // it.
+        AddIDBoundMatcher<HandleUsagePoints>("typeLoc",
+            typeLoc(isExpansionInMainFile()));
     }
     {
         auto ProblematicDeclUsages = {
@@ -276,8 +279,15 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);
     }
 
-    AddIDBoundMatcher<HandleFindingImplementsRelation>(
-        "id", decl()); // TODO: wip.
+    //
+    {
+        auto ImplementingDecls = {
+            functionDecl(ImplementedInTheTU),
+            varDecl(ImplementedInTheTU)
+        };
+        for (auto Matcher : ImplementingDecls)
+            AddIDBoundMatcher<HandleFindingImplementsRelation>(Matcher);
+    }
 }
 
 MatcherFactory::~MatcherFactory()
