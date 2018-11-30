@@ -50,7 +50,6 @@ if not success:
 # that conflict with a later file fragment.
 success, _, output = call_process(SYMBOL_REWRITER_BINARY,
                                   [os.path.dirname(COMPILE_COMMAND_JSON),
-                                   'TODO-UNUSED',  # TODO: What's this?
                                    str(multiprocessing.cpu_count())],
                                   cwd=START_FOLDER,
                                   stdout=None)
@@ -94,6 +93,26 @@ for directive_file in tqdm(symbol_rename_files,
                                       from_str, to_str)
         if not success:
           print("Replacement failed for directive: %s" % line, file=sys.stderr)
+      except IndexError:
+        print("Invalid directive in file:\n\t%s" % line, file=sys.stderr)
+        continue
+
+header_implements_files = list(filter(lambda s: s.endswith("-implements.txt"),
+                                      walk_folder(START_FOLDER)))
+for directive_file in tqdm(header_implements_files,
+                           desc="Finding implemented headers",
+                           unit='file'):
+  with open(directive_file, 'r') as directive_handle:
+    if os.fstat(directive_handle.fileno()).st_size == 0:
+      os.unlink(directive_file)
+      continue
+
+    for line in reversed(list(directive_handle)):
+      # Parse the output of the directive file. A line is formatted like:
+      #     main.cpp##something.h
+      try:
+        parts = line.strip().split('##')
+        filename, header = parts[0], parts[1]
       except IndexError:
         print("Invalid directive in file:\n\t%s" % line, file=sys.stderr)
         continue

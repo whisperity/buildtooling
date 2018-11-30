@@ -22,15 +22,12 @@ using namespace whisperity;
  */
 int main(int argc, const char** argv)
 {
-    if (argc < 2 || argc > 4)
+    if (argc < 2 || argc > 3)
     {
-        // TODO: The output for "implements" is not used.
-        // FIXME: Noone says anything about the threadcount argument.
         std::cerr << "usage: " << argv[0] <<
-                  " <build folder> [output for 'implements' relation]" <<
+                  " <build folder> [thread count]" <<
                   std::endl;
-        std::cerr << "\t'implements' relation output will be written in the "
-                     "build folder by default." << std::endl;
+        std::cerr << "\t'thread-count' will be 1 by default." << std::endl;
         return 2;
     }
 
@@ -50,14 +47,9 @@ int main(int argc, const char** argv)
         return 1;
     }
 
-    std::string OutputPath = BuildFolder.str() + "/implements.dat";
     size_t ThreadCount = 1;
-
     if (argc >= 3)
-        OutputPath = argv[2];
-
-    if (argc >= 4)
-        ThreadCount = std::stoull(argv[3]);
+        ThreadCount = std::stoull(argv[2]);
 
     // ------------------------- Initialise the system -------------------------
     std::unique_ptr<CompilationDatabase> CompDb;

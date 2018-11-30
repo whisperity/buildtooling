@@ -78,11 +78,11 @@ def replace_at_position(filename, line, col, from_str, to_str):
                          % (line, col))
 
       line_tail = line_to_change[col - 1:]
-      new_tail = line_tail.replace(from_str, to_str, 1)
-      if line_tail == new_tail:
+      if not line_tail.startswith(from_str):
         raise KeyError("The replacement at the given position did not match "
                        "the given string that were to be replaced.")
 
+      new_tail = line_tail.replace(from_str, to_str, 1)
       new_line = line_to_change[:col - 1] + new_tail
       lines[line - 1] = new_line
 
