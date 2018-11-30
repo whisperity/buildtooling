@@ -23,6 +23,11 @@ std::unique_ptr<FileReplaceDirectives> getReplacementsForCompilation(
     const std::string& Filename,
     const std::vector<std::string>& CompileCommand);
 
+std::unique_ptr<ImplementsEdges> getImplementsRelationForCompilation(
+    const FileMap& FileMap,
+    const std::string& Filename,
+    const std::vector<std::string>& CompileCommand);
+
 bool positionFound(
     const std::vector<FileReplaceDirectives::Position>& PVec,
     size_t Line,
