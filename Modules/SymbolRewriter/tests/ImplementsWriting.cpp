@@ -30,20 +30,20 @@ TEST(ImplementsEdgeWriting, Empty)
 TEST(ImplementsEdgeWriting, Single)
 {
     auto IE = getIE();
-    IE.AddFileImplemented("header.h");
+    IE.AddImplemented("header.h", "?");
 
     ASSERT_EQ(getEdgesAsString(IE),
-              "main.cpp##header.h\n");
+              "main.cpp##header.h##?\n");
 }
 
 TEST(ImplementsEdgeWriting, Multiple)
 {
     auto IE = getIE();
-    IE.AddFileImplemented("header.h");
-    IE.AddFileImplemented("/usr/include/foo.h");
+    IE.AddImplemented("header.h", "X");
+    IE.AddImplemented("/usr/include/foo.h", "foo::bar");
 
     ASSERT_EQ(getEdgesAsString(IE),
-              R"BUF(main.cpp##/usr/include/foo.h
-main.cpp##header.h
+              R"BUF(main.cpp##/usr/include/foo.h##foo::bar
+main.cpp##header.h##X
 )BUF");
 }

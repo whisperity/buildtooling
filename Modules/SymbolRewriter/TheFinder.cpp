@@ -1,7 +1,5 @@
 #include "TheFinder.h"
 
-#include <iostream>
-
 #include <clang/AST/DeclCXX.h>
 
 #include "ImplementsEdges.h"
@@ -261,11 +259,14 @@ public:
             // can happen if e.g. someone put a forward declaration after
             // another one, and before the main definition.
             return;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // If the declaration hasn't a name, it cannot be renamed.
+            return;
 
         // Note: Declaration chains need not be walked transitively, because the
         // matcher matches on every declaration.
 
-        Implementses.AddFileImplemented(Filename);
+        Implementses.AddImplemented(Filename, ND->getName().str());
     }
 
 private:

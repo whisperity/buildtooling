@@ -1,5 +1,6 @@
 #include "ImplementsEdges.h"
 
+#include <initializer_list>
 #include <iostream>
 #include <utility>
 
@@ -10,9 +11,12 @@ ImplementsEdges::ImplementsEdges(std::string Filepath)
     : Filepath(std::move(Filepath))
 {}
 
-void ImplementsEdges::AddFileImplemented(std::string Implemented)
+void ImplementsEdges::AddImplemented(std::string Filename,
+                                     std::string ImplementedSymbol)
 {
-    ImplementedSet.emplace(std::move(Implemented));
+    auto ItP = ImplementationMap.try_emplace(
+        std::move(Filename), std::initializer_list<std::string>{});
+    ItP.first->second.emplace(std::move(ImplementedSymbol));
 }
 
 const std::string& ImplementsEdges::getFilepath() const
@@ -20,9 +24,10 @@ const std::string& ImplementsEdges::getFilepath() const
     return Filepath;
 }
 
-const std::set<std::string>& ImplementsEdges::getImplementedFiles() const
+const ImplementsEdges::ImplementsMap&
+ImplementsEdges::getImplementationMap() const
 {
-    return ImplementedSet;
+    return ImplementationMap;
 }
 
 void writeImplementsOutput(
@@ -30,8 +35,9 @@ void writeImplementsOutput(
     const ImplementsEdges& Implementses)
 {
     const std::string& FP = Implementses.getFilepath();
-    for (const std::string& File : Implementses.getImplementedFiles())
-        Output << FP << "##" << File << std::endl;
+    for (const auto& E : Implementses.getImplementationMap())
+        for (const std::string& Symbol : E.second)
+            Output << FP << "##" << E.first << "##" << Symbol << std::endl;
 }
 
 } // namespace SymbolRewriter

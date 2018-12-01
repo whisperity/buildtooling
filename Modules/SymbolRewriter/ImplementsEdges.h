@@ -2,6 +2,7 @@
 #define SYMBOLREWRITER_IMPLEMENTSEDGES_H
 
 #include <iosfwd>
+#include <map>
 #include <set>
 
 namespace SymbolRewriter
@@ -15,20 +16,23 @@ class ImplementsEdges
 {
 
 public:
+    typedef std::map<std::string, std::set<std::string>> ImplementsMap;
+
     ImplementsEdges(std::string Filepath);
 
-    void AddFileImplemented(std::string Implemented);
+    void AddImplemented(std::string Filename,
+                        std::string ImplementedSymbol);
 
     const std::string& getFilepath() const;
 
     /**
      * Get the files that are implemented by the instance's file.
      */
-    const std::set<std::string>& getImplementedFiles() const;
+    const ImplementsMap& getImplementationMap() const;
 
 private:
     const std::string Filepath;
-    std::set<std::string> ImplementedSet;
+    ImplementsMap ImplementationMap;
 
 };
 
