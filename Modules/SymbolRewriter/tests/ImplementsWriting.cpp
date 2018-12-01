@@ -42,8 +42,9 @@ TEST(ImplementsEdgeWriting, Multiple)
     IE.AddImplemented("header.h", "X");
     IE.AddImplemented("/usr/include/foo.h", "foo::bar");
 
-    ASSERT_EQ(getEdgesAsString(IE),
-              R"BUF(main.cpp##/usr/include/foo.h##foo::bar
+    std::string Expected = R"BUF(main.cpp##/usr/include/foo.h##foo::bar
 main.cpp##header.h##X
-)BUF");
+)BUF";
+
+    ASSERT_EQ(getEdgesAsString(IE), Expected);
 }
