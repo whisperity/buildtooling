@@ -93,9 +93,10 @@ for directive_file in tqdm(symbol_rename_files,
                                             int(line), int(col),
                                             from_str, to_str)
         if not success:
-          print("Replacement failed for directive: %s" % line, file=sys.stderr)
+          tqdm.write("Replacement failed for directive: %s" % line,
+                     file=sys.stderr)
       except IndexError:
-        print("Invalid directive in file:\n\t%s" % line, file=sys.stderr)
+        tqdm.write("Invalid directive in file:\n\t%s" % line, file=sys.stderr)
         continue
 
 
@@ -128,9 +129,41 @@ for directive_file in tqdm(header_implements_files,
         implementee = utils.strip_folder(START_FOLDER, parts[0])
         implemented = utils.strip_folder(START_FOLDER, parts[1])
         DEPENDENCY_MAP.add_dependency(implementee, implemented, 'implements')
+      except ValueError as ve:
+        tqdm.write("Implements relation failed, because: %s" % str(ve),
+                   file=sys.stderr)
       except IndexError:
-        print("Invalid directive in file:\n\t%s" % line, file=sys.stderr)
+        tqdm.write("Invalid directive in file:\n\t%s" % line, file=sys.stderr)
         continue
+
+
+# The implements relations could make the whole setup insane when a "header"'s
+# contents is implemented by multiple translation units belonging to different
+# modules. Because the latter algorithm only *splits* modules apart, if the
+# initial mapping is insane, the calculations don't need to be made, as further
+# splits won't fix the input.
+insanity = mapping.get_dependency_map_implementation_insanity(DEPENDENCY_MAP)
+if insanity:
+  print("Error: The initial input of module-assignments given to the "
+        "algorithm is insane. At least one interface (\"header\") file is "
+        "implemented by translation units assigned to multiple different "
+        "modules.", file=sys.stderr)
+
+  for implemented, module_and_files in sorted(insanity.items()):
+    module_of_implemented = next(
+      MODULEMAP.get_modules_for_fragment(implemented),
+      None)
+    print("Symbols of file '%s' in module %s is implemented by:"
+          % (implemented, module_of_implemented), file=sys.stderr)
+    for module, file_list in sorted(module_and_files.items()):
+      print("    in module '%s':" % module, file=sys.stderr)
+      for file in sorted(file_list):
+        print("        %s" % file, file=sys.stderr)
+
+  print("Please review and change your code, or remove the problematic "
+        "interface files from the assignment, reducing them to pure headers.",
+        file=sys.stderr)
+  sys.exit(1)
 
 
 # First look for header files and handle the include directives that a

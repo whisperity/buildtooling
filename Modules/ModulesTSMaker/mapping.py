@@ -6,7 +6,6 @@ from collections import Counter
 from operator import itemgetter
 
 try:
-  import matplotlib.pyplot as plt
   import networkx as nx
 except ImportError as e:
   print("Error! A dependency of this tool could not be satisfied. Please "
@@ -193,6 +192,13 @@ class DependencyMap():
     return item in self._map.keys() or any([item in module
                                             for module in self._map])
 
+  def get_module_map(self):
+    """
+    :return: The :type ModuleMapping: that was attached to the current
+    :type DependencyMap:.
+    """
+    return self._module_mapping
+
   def add_dependency(self, dependee, dependency, kind="uses"):
     """
     Add the dependency that :param dependee: depends on :param dependency:.
@@ -202,9 +208,17 @@ class DependencyMap():
     if kind not in ['uses', 'implements']:
       raise ValueError("'kind' should be either 'uses' or 'implements'.")
 
-    dependee_modules = self._module_mapping.get_modules_for_fragment(dependee)
-    dependency_modules = self._module_mapping.get_modules_for_fragment(
-      dependency)
+    dependee_modules = list(
+      self._module_mapping.get_modules_for_fragment(dependee))
+    dependency_modules = list(
+      self._module_mapping.get_modules_for_fragment(dependency))
+
+    if not dependee_modules:
+      raise ValueError("Cannot add dependency of '%s' because it is not "
+                       "assigned to any module." % dependee)
+    if not dependency_modules:
+      raise ValueError("Cannot add dependency for '%s' because it is not "
+                       "assigned to any module." % dependency)
 
     for mod in dependee_modules:
       if mod not in self._map:
@@ -578,3 +592,46 @@ def write_topological_order(module_file,
     f.truncate(f.tell())
 
   return True
+
+
+def get_dependency_map_implementation_insanity(dependency_map):
+  """
+  Returns whether the given :param dependency_map: (in its current state) is
+  sane for the 'implements-relation' dependencies. If the map is not sane,
+  returns, for each file that spans the insanity, a dict with the modules
+  implementing it as keys, and a set of files as values. Otherwise, just
+  returns an empty dict.
+
+  A dependency map is implementation-sane if every file that is implemented is
+  only implemented by files in at most a single module.
+
+  :note: This operation is costly to calculate as it involves a reverse mapping
+  and should not be called too many times.
+  """
+  file_implemented_in_module = dict()
+  for file in dependency_map.get_module_map().get_all_fragments():
+    file_implementees = dict()
+
+    for dependee_tuple in dependency_map.get_dependees(file):
+      dependee, kind = dependee_tuple
+      if kind != 'implements':
+        continue
+
+      dependee_modules = dependency_map \
+        .get_module_map() \
+        .get_modules_for_fragment(dependee)
+      for implementing_module in dependee_modules:
+        implementees_in_module = file_implementees.get(implementing_module,
+                                                       set())
+        if not implementees_in_module:
+          file_implementees[implementing_module] = implementees_in_module
+        implementees_in_module.add(dependee)
+
+    if file_implementees:
+      file_implemented_in_module[file] = file_implementees
+
+  # Filter the implements relations to only the files that are not sane.
+  insane_implements_relations = dict(
+    filter(lambda e: len(e[1]) > 1, file_implemented_in_module.items()))
+
+  return insane_implements_relations
