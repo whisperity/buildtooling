@@ -80,6 +80,6 @@ def filter_imports_from_includes(filename,
         lines_to_keep.append(line.strip())
         continue
 
-    dependency_map.add_dependency(filename, included)
+    dependency_map.add_dependency(filename, included, 'uses')
 
   return ''.join(other_lines)

@@ -193,10 +193,15 @@ class DependencyMap():
     return item in self._map.keys() or any([item in module
                                             for module in self._map])
 
-  def add_dependency(self, dependee, dependency):
+  def add_dependency(self, dependee, dependency, kind="uses"):
     """
     Add the dependency that :param dependee: depends on :param dependency:.
+
+    :param kind: should be `uses` or `implements`.
     """
+    if kind not in ['uses', 'implements']:
+      raise ValueError("'kind' should be either 'uses' or 'implements'.")
+
     dependee_modules = self._module_mapping.get_modules_for_fragment(dependee)
     dependency_modules = self._module_mapping.get_modules_for_fragment(
       dependency)
@@ -209,9 +214,10 @@ class DependencyMap():
 
       for dep in dependency_modules:
         if dep not in self._map[mod][dependee]:
-          self._map[mod][dependee][dep] = []
-        if dependency not in self._map[mod][dependee][dep]:
-          self._map[mod][dependee][dep].append(dependency)
+          self._map[mod][dependee][dep] = {'uses': [],
+                                           'implements': []}
+        if dependency not in self._map[mod][dependee][dep][kind]:
+          self._map[mod][dependee][dep][kind].append(dependency)
 
   def remove_file(self, filename):
     """
@@ -224,46 +230,38 @@ class DependencyMap():
       if filename in self._map[module]:
         # Found a module which contains 'filename', and dependency information
         # of it. File is deleted, so remove the entire inner dict.
-        # print("FOUND FILE TO REMOVE IN A MODULE", filename)
         del self._map[module][filename]
         if not self._map[module]:
           # The module has emptied out.
           modules_to_remove.append(module)
 
-      # print("MODULE", module)
       files_to_remove_from_module = list()
       for file_in_module in self._map[module]:
-        # print("FILE IN MODULE", module, file_in_module)
         inner_modules_to_remove = list()
-        for dep_module, dep_filelist in \
+        for dep_module, dep_filedict in \
               self._map[module][file_in_module].items():
-          if filename in dep_filelist:
-            # Remove the file from every file's dependency list, if found.
-            # print("FOUND FILE TO REMOVE AS DEPENDENCY", filename)
-            dep_filelist.remove(filename)
-            if not dep_filelist:
-              # The dependency list of module 'dep_module' for
-              # 'file_in_module' has emptied out, remove this entry.
-              inner_modules_to_remove.append(dep_module)
+          for kind in dep_filedict:
+            if filename in dep_filedict[kind]:
+              # Remove the file from every file's dependency list, if found.
+              dep_filedict[kind].remove(filename)
+
+          if all(not l for l in dep_filedict.values()):
+            # The dependency list of module 'dep_module' for
+            # 'file_in_module' has emptied out, remove this entry.
+            inner_modules_to_remove.append(dep_module)
 
         for remove_module in inner_modules_to_remove:
           # Clear module-level dependency if now in fact the file does not
           # depend on said module anymore.
-          # print("MODULE", remove_module, "AS DEPENDENCY EMPTIED")
           del self._map[module][file_in_module][remove_module]
 
         if not self._map[module][file_in_module]:
-          # print("DEPENDENCY LIST OF", module, file_in_module, "EMPTIED.")
           files_to_remove_from_module.append(file_in_module)
 
       for remove_from_module in files_to_remove_from_module:
-        # print("DEPENDENCY LIST OF", remove_from_module, "EMPTY... DELETING "
-        #       "FILE")
         del self._map[module][remove_from_module]
 
     for remove_module in modules_to_remove:
-      # print("MODULE", remove_module, "NO LONGER CONTAINS ANY FILES THAT "
-      #       "DEPEND... REMOVING.")
       del self._map[remove_module]
 
   def get_dependencies(self, filename):
@@ -271,7 +269,7 @@ class DependencyMap():
     :return: A collection of files :param filename: depends on, across every
     module.
     """
-    ret = set()
+    ret = {'uses': set(), 'implements': set()}
     modules = self._module_mapping.get_modules_for_fragment(filename)
 
     for mod in modules:
@@ -281,7 +279,10 @@ class DependencyMap():
         continue
 
       for dependency_module in self._map[mod][filename]:
-        ret.update(set(self._map[mod][filename][dependency_module]))
+        ret['uses'].update(
+          set(self._map[mod][filename][dependency_module]['uses']))
+        ret['implements'].update(
+          set(self._map[mod][filename][dependency_module]['implements']))
 
     return ret
 
@@ -295,8 +296,10 @@ class DependencyMap():
     for mod in self._map:
       for dependee_file in self._map[mod]:
         for dependee_module in self._map[mod][dependee_file]:
-          if filename in self._map[mod][dependee_file][dependee_module]:
-            ret.add(dependee_file)
+          for kind in self._map[mod][dependee_file][dependee_module]:
+            if filename in \
+                  self._map[mod][dependee_file][dependee_module][kind]:
+              ret.add((dependee_file, kind))
 
     return ret
 
@@ -305,14 +308,16 @@ class DependencyMap():
     Retrieve the list of files that are the reason that :param from_module:
     depends on :param to_module:.
 
-    :return: A dictionary object containing a filename => set of filenames
-    mapping.
+    :return: A dictionary object containing a filename => set of
+    (filenames, kind) mapping.
     """
     ret = dict()
     for from_file in self._map.get(from_module, []):
       ret[from_file] = set()
-      for to_file in self._map[from_module][from_file].get(to_module, []):
-        ret[from_file].add(to_file)
+      for kind, filelist in self._map[from_module][from_file]\
+            .get(to_module, {}).items():
+        for to_file in filelist:
+          ret[from_file].add((to_file, kind))
 
       if len(ret[from_file]) == 0:
         del ret[from_file]
@@ -323,8 +328,8 @@ class DependencyMap():
     Get the list of dependencies of files in :param module: which are also in
     :param module:.
 
-    :return: A dictionary object containing a filename => set of filenames
-    mapping.
+    :return: A dictionary object containing a filename => set of
+    (filenames, kind) mapping.
     """
     return self.get_files_creating_dependency_between(module, module)
 
@@ -338,8 +343,14 @@ class DependencyMap():
 
     for module in self._map:
       module_dependencies = set()
-      for file_entry in self._map[module].values():
-        module_dependencies.update(file_entry.keys())
+      for dependency_entry in self._map[module].values():
+        for module_name in dependency_entry:
+          if dependency_entry[module_name]['uses']:
+            # Only consider an other module to be imported if it is *used*, not
+            # in the "implements" relation.
+            module_dependencies.add(module_name)
+
+      # Never consider self-dependency.
       module_dependencies.discard(module)
 
       for dependency in module_dependencies:
@@ -472,10 +483,14 @@ def apply_file_moves(module_map, dependency_map, moved_files):
 
   dependencies_to_fix_up = list()
   for filename in moved_files:
-    for file_depending_on_moved in dependency_map.get_dependees(filename):
-      dependencies_to_fix_up.append((file_depending_on_moved, filename))
-    for moved_depending_on_file in dependency_map.get_dependencies(filename):
-      dependencies_to_fix_up.append((filename, moved_depending_on_file))
+    for file_depending_on_moved, dep_kind in \
+          dependency_map.get_dependees(filename):
+      dependencies_to_fix_up.append(
+        (file_depending_on_moved, filename, dep_kind))
+    for dep_kind, files in dependency_map.get_dependencies(filename).items():
+      for moved_depending_on_file in files:
+        dependencies_to_fix_up.append(
+          (filename, moved_depending_on_file, dep_kind))
 
     dependency_map.remove_file(filename)
 
@@ -485,10 +500,10 @@ def apply_file_moves(module_map, dependency_map, moved_files):
       module_map.add_module(new_module, os.devnull)
     module_map.add_fragment(new_module, filename)
 
-  for dependee, dependency in dependencies_to_fix_up:
+  for dependee, dependency, kind in dependencies_to_fix_up:
     # Fix the dependency map so the file->file dependencies now point through
     # the new module names.
-    dependency_map.add_dependency(dependee, dependency)
+    dependency_map.add_dependency(dependee, dependency, kind)
 
   # Resynthesize the import list because file-module relations have changed.
   dependency_map.synthesize_intermodule_imports()
