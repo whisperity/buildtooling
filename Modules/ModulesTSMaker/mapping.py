@@ -428,15 +428,13 @@ def get_module_mapping(srcdir):
 
   # Check for files that are (perhaps accidentally) included in multiple module
   # files.
+  duplicated = list()
   counts = Counter(mapping.get_all_fragments())
   for module in mapping:
     fragments = mapping.get_fragment_list(module)
-    for file in list(filter(lambda x: counts[x] != 1, fragments)):
+    for file in filter(lambda x: counts[x] != 1, fragments):
+      duplicated.append(file)
       fragments.remove(file)
-
-  duplicated = list(dict(filter(lambda it: it[1] != 1,
-                                counts.items()))
-                    .keys())
 
   mapping.set_not_tainted()
   return mapping, duplicated
@@ -574,7 +572,7 @@ def write_topological_order(module_file,
             file=sys.stderr)
       return False
 
-    # Rewrite this part to contain the topological order of headers.
+    # Rewrite this part to contain the topological order of files.
     new_includes = []
     for file in topological:
       # Modules usually include files relative to the module file's own

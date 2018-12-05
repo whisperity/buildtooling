@@ -110,7 +110,10 @@ if DUPLICATES:
   print('\n'.join(DUPLICATES), file=sys.stderr)
 
 
-# TODO: ???
+# The SYMBOL_REWRITER_BINARY also emits the knowledge about what file
+# implements symbols from what other file. This has to be added to the
+# algorithm's knowledge, as Module files (CPPMs) have to contain *both*
+# interface and implementation.
 header_implements_files = list(filter(lambda s: s.endswith("-implements.txt"),
                                       utils.walk_folder(START_FOLDER)))
 for directive_file in tqdm(header_implements_files,
@@ -153,10 +156,14 @@ if insanity:
     module_of_implemented = next(
       MODULEMAP.get_modules_for_fragment(implemented),
       None)
-    print("Symbols of file '%s' in module %s is implemented by:"
-          % (implemented, module_of_implemented), file=sys.stderr)
+    print("Symbols of file '%s' in module %s (%s) is implemented by:"
+          % (implemented,
+             module_of_implemented,
+             MODULEMAP.get_filename(module_of_implemented)),
+          file=sys.stderr)
     for module, file_list in sorted(module_and_files.items()):
-      print("    in module '%s':" % module, file=sys.stderr)
+      print("    in module '%s' (%s):"
+            % (module, MODULEMAP.get_filename(module)), file=sys.stderr)
       for file in sorted(file_list):
         print("        %s" % file, file=sys.stderr)
 
@@ -173,9 +180,6 @@ for file in tqdm(headers,
                  desc="Collecting includes",
                  unit='header',
                  position=1):
-  if not re.search(HEADER_FILE, file):
-    continue
-
   content = None
   try:
     with codecs.open(file, 'r', encoding='utf-8', errors='replace') as f:
@@ -225,6 +229,32 @@ with multiprocessing.Pool() as pool:
 
     iteration_count += 1
 
+
+# Headers have been moved at this point, but only the module map in memory has
+# changed, not the original source code. The next step is to move the
+# non-header files alongside with the headers, for the types they implement
+# (as modules need to contain interface and implementation in the same "TU").
+implementation_files_to_move = dict()
+for module in tqdm(sorted(MODULEMAP),
+                   desc="Organising implementation files",
+                   unit='module'):
+  files_in_module = MODULEMAP.get_fragment_list(module)
+
+  for header in filter(HEADER_FILE.search, files_in_module):
+    dependee_set = DEPENDENCY_MAP.get_dependees(header)
+    for dependee, kind in dependee_set:
+      if kind != 'implements':
+        continue
+
+      modules_of_dependee = list(MODULEMAP.get_modules_for_fragment(dependee))
+      if modules_of_dependee[0] != module:
+        implementation_files_to_move[dependee] = module
+
+mapping.apply_file_moves(MODULEMAP,
+                         DEPENDENCY_MAP,
+                         implementation_files_to_move)
+
+
 # After (and if successfully) the modules has been split up, commit the changes
 # to the file system for the upcoming operations.
 if iteration_count > 1:
@@ -240,6 +270,7 @@ if iteration_count > 1:
 # However, for this module "wrapper" file to work, the includes of the
 # module "fragments" (which are rewritten by this script) must be in
 # a good order.
+topological_success = True
 for module in tqdm(sorted(MODULEMAP),
                    desc="Sorting headers",
                    unit='module'):
@@ -251,7 +282,7 @@ for module in tqdm(sorted(MODULEMAP),
   intramodule_dependencies = dict(map(lambda x: (x, []),
                                       headers_in_module))
   # Then add the list of known dependencies from the previous built map.
-  for dependee, dep_pair in \
+  for dependee_module, dep_pair in \
         DEPENDENCY_MAP.get_intramodule_dependencies(module).items():
     dep_list = list()
     for tupl in dep_pair:
@@ -262,18 +293,16 @@ for module in tqdm(sorted(MODULEMAP),
     if dep_list:
       # Only save the dependency into this dict if the file partook in any
       # uses-dependency relation.
-      intramodule_dependencies[dependee] = sorted(dep_list)
+      intramodule_dependencies[dependee_module] = sorted(dep_list)
 
-  mapping.write_topological_order(
-    MODULEMAP.get_filename(module),
-    HEADER_FILE,
-    intramodule_dependencies)
+  topological_success = topological_success and \
+                        mapping.write_topological_order(
+                          MODULEMAP.get_filename(module),
+                          HEADER_FILE,
+                          intramodule_dependencies)
 
-
-# Headers have been moved and ordered at this point, but only the module files
-# are changed, not the original source code. The next step is to move the
-# non-header files alongside with the headers, for the types they implement
-# (as modules need to contain interface and implementation in the same "TU").
-# QUESTION: How to find which original C++ source code implements which header?
-# ("Same filename" seems like a good enough heuristic but we might need more.)
-pass
+if not topological_success:
+  print("Error: one of more module files' interface (header) part could not "
+        "have been sorted properly.",
+        file=sys.stderr)
+  sys.exit(1)
