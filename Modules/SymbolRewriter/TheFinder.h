@@ -10,6 +10,7 @@ namespace SymbolRewriter
 {
 
 class FileReplaceDirectives;
+class ImplementsEdges;
 
 /**
  * A helper class that creates the necessary matchers for this tool based on the
@@ -20,14 +21,15 @@ class FileReplaceDirectives;
 class MatcherFactory
 {
 public:
-    MatcherFactory(const std::string& Filename,
-                   FileReplaceDirectives& Replacements);
+    MatcherFactory(FileReplaceDirectives& Replacements,
+                   ImplementsEdges& ImplementsEdges);
     ~MatcherFactory();
 
     clang::ast_matchers::MatchFinder& operator()();
 
 private:
     FileReplaceDirectives& Replacements;
+    ImplementsEdges& Implementses;
 
     clang::ast_matchers::MatchFinder TheFinder;
     std::vector<clang::ast_matchers::MatchFinder::MatchCallback*> Callbacks;

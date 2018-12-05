@@ -22,10 +22,15 @@ namespace SymbolRewriter
 {
 
 class FileReplaceDirectives;
+class ImplementsEdges;
 
 typedef std::map<std::string, std::string> FileMap;
 
-typedef std::variant<int, std::unique_ptr<FileReplaceDirectives>> ToolResult;
+typedef std::pair<
+    std::unique_ptr<FileReplaceDirectives>,
+    std::unique_ptr<ImplementsEdges>> UsefulResultType;
+
+typedef std::variant<int, UsefulResultType> ToolResult;
 
 /**
  * Wrapper class that saves an 'ExecuteTool' call's inputs and allows later

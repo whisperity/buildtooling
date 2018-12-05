@@ -52,10 +52,11 @@ TEST(RenameWriting, Multiple)
     // but not a usual case.
     FRD.AddReplacementPosition(8, 20, "Foo", ADDR(2));
 
-    ASSERT_EQ(getReplacementsAsString(FRD),
-R"BUF(main.cpp##1:1##Foo##main_Foo
+    std::string Expected = R"BUF(main.cpp##1:1##Foo##main_Foo
 main.cpp##2:1##Foo##main_Foo
 main.cpp##4:1##Bar##main_Bar
 main.cpp##8:20##Foo##main_Bar
-)BUF");
+)BUF";
+
+    ASSERT_EQ(getReplacementsAsString(FRD), Expected);
 }

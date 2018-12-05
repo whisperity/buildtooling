@@ -60,12 +60,12 @@ def rotate_list_of_cycles(lst):
   >>> mylist = [["SystemPath", "SystemFail"], ["SomeItem", "SomeBullet"]]
   >>> rotate_list_of_cycles(mylist)
   >>> mylist
-  [["SystemFail", "SystemPath"], ["SomeBullet", "SomeItem"]]
+  [['SystemFail', 'SystemPath'], ['SomeBullet', 'SomeItem']]
 
   >>> mylist = [["Foo", "Baz", "Bar"], ["Foo", "Asd"]]
   >>> rotate_list_of_cycles(mylist)
   >>> mylist
-  [["Bar", "Foo", "Baz"], ["Asd", "Foo"]]
+  [['Bar', 'Foo', 'Baz'], ['Asd', 'Foo']]
 
   >>> mylist = [["BOne", "BTwo", "AOne"], \
                 ["BOne", "AOne"],         \
@@ -73,6 +73,11 @@ def rotate_list_of_cycles(lst):
   >>> rotate_list_of_cycles(mylist)
   >>> mylist
   [['AOne', 'BOne', 'BTwo'], ['AOne', 'BOne'], ['NFoobar', 'ZLast', 'XSystem']]
+
+  >>> mylist = [['D', 'C', 'B', 'A']]
+  >>> rotate_list_of_cycles(mylist)
+  >>> mylist
+  [['A', 'D', 'C', 'B']]
   """
 
   for i, c in enumerate(lst):
@@ -90,4 +95,4 @@ def rotate_list_of_cycles(lst):
     d = collections.deque(expand)
     d.rotate(-min_idx)
 
-    lst[i] = list(map(lambda s: s.strip(), d))
+    lst[i] = list(map(lambda s: s.rstrip(), d))

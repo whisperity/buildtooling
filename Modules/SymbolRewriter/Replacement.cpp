@@ -81,7 +81,6 @@ void writeReplacementOutput(std::ostream& Output,
                             const FileReplaceDirectives& Directives)
 {
     const std::string& FP = Directives.getFilepath();
-
     for (const auto& E : Directives.getReplacements())
     {
         Output << FP << "##"

@@ -22,6 +22,7 @@ add_custom_target(ClangHeaders
     COMMENT "Making necessary Clang headers available...")
 
 link_directories(${LLVM_LIBRARY_DIRS} ${CLANG_LIBRARY_DIRS})
+set(CMAKE_BUILD_RPATH ${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS} ${CLANG_DEFINITIONS})
 set(LLVM_LIBRARIES_USED "")
 list(APPEND LLVM_LIBRARIES_USED
@@ -35,6 +36,7 @@ list(APPEND LLVM_LIBRARIES_USED
 
 add_library(RewritingTool STATIC
     Executor.cpp
+    ImplementsEdges.cpp
     Replacement.cpp
     TheFinder.cpp)
 
@@ -55,6 +57,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_executable(RewriteTest
         Test.cpp
         tests/DeclarationRewriting.cpp
+        tests/ImplementsWriting.cpp
+        tests/ImplementsRelation.cpp
         tests/MatchProblematicDeclarations.cpp
         tests/RenameWriting.cpp
         tests/UsagePoints.cpp)

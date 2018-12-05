@@ -1,9 +1,8 @@
 #include "TheFinder.h"
 
-#include <iostream>
-
 #include <clang/AST/DeclCXX.h>
 
+#include "ImplementsEdges.h"
 #include "Replacement.h"
 
 using namespace clang;
@@ -14,14 +13,21 @@ namespace
 {
 
 /**
- * Search all declarations that have a usable name identifier, and that are
- * expanded in the main file - i.e. they aren't in the TU because they are in
- * an included header.
+ * Search all declarations that have a usable name identifier but cannot be
+ * named from the outside, and that are expanded in the main file - i.e. they
+ * aren't in the TU because they are in an included header.
  */
 auto LocalInTheTU = namedDecl(
-    allOf(
-        unless(hasExternalFormalLinkage()),
-        isExpansionInMainFile()));
+    unless(hasExternalFormalLinkage()),
+    isExpansionInMainFile());
+
+/**
+ * Matches outside-addressable named declarations that are implemented in the
+ * current TU.
+ */
+auto ExternallyNamedButImplementedInTheTU = namedDecl(
+    hasExternalFormalLinkage(),
+    isExpansionInMainFile());
 
 /**
  * However, the previous matcher would also match things like a local variable
@@ -47,21 +53,30 @@ auto InSomeGlobalishScope = anyOf(
 auto TUInternalTraits = allOf(LocalInTheTU, InSomeGlobalishScope);
 
 /**
- * A match result callback class that handles the rewriting of problematic
- * declarations.
+ * To seek out which headers are implemented in the current TU, we need only the
+ * declarations that are in the above global-ish scope.
+ */
+auto TUVisibleTraits = allOf(
+    ExternallyNamedButImplementedInTheTU,
+    InSomeGlobalishScope);
+
+/**
+ * A match result callback class that handles the renaming of problematically
+ * named declarations.
  */
 class HandleDeclarations
     : public MatchFinder::MatchCallback
 {
 
 public:
-    HandleDeclarations(FileReplaceDirectives& Replacements)
+    HandleDeclarations(FileReplaceDirectives& Replacements,
+                       ImplementsEdges&)
         : Replacements(Replacements)
     {}
 
     void run(const MatchFinder::MatchResult& Result) override
     {
-        auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
+        const auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
         assert(ND && "Something matched as `id` but it wasn't a `NamedDecl`?");
 
         if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
@@ -100,7 +115,8 @@ class HandleUsagePoints
 {
 
 public:
-    HandleUsagePoints(FileReplaceDirectives& Replacements)
+    HandleUsagePoints(FileReplaceDirectives& Replacements,
+                      ImplementsEdges&)
         : Replacements(Replacements)
     {}
 
@@ -203,42 +219,92 @@ private:
     FileReplaceDirectives& Replacements;
 };
 
+/**
+ * A match result callback that registers that the source file implements
+ * symbols from a header.
+ */
+class HandleFindingImplementsRelation
+    : public MatchFinder::MatchCallback
+{
+public:
+    HandleFindingImplementsRelation(FileReplaceDirectives&,
+                                    ImplementsEdges& Implementses)
+        : Implementses(Implementses)
+    {}
+
+    void run(const MatchFinder::MatchResult& Result) override
+    {
+        const auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
+        assert(ND && "Something matched as `id` but it wasn't a `NamedDecl`?");
+        const Decl* PD = ND->getPreviousDecl();
+        if (!PD)
+            // If no PreviousDecl is found then the current declaration is the
+            // one and only. In this case, this is some local symbol that was
+            // never defined in a header but still has external linkage.
+            // (This might be a case of developer oversight, or simply bad code,
+            // or a symbol that is loaded dynamically. We unfortunately can't
+            // support these cases in a nice fashion.)
+            return;
+
+        const SourceManager& SM = PD->getASTContext().getSourceManager();
+        const SourceLocation& SLoc = SM.getSpellingLoc(PD->getLocStart());
+        std::string Filename = SM.getFilename(SLoc);
+        if (SLoc.isInvalid())
+            return;
+        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+            // System headers should stay where they are...
+            return;
+        if (Implementses.getFilepath() == Filename)
+            // Ignore PreviousDecl's that are still in the current file. This
+            // can happen if e.g. someone put a forward declaration after
+            // another one, and before the main definition.
+            return;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // If the declaration hasn't a name, it cannot be renamed.
+            return;
+
+        // Note: Declaration chains need not be walked transitively, because the
+        // matcher matches on every declaration.
+
+        Implementses.AddImplemented(Filename, ND->getName().str());
+    }
+
+private:
+    ImplementsEdges& Implementses;
+};
+
 } // namespace (anonymous)
 
 namespace SymbolRewriter
 {
 
-MatcherFactory::MatcherFactory(const std::string& Filename,
-                               FileReplaceDirectives& Replacements)
+MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
+                               ImplementsEdges& ImplementsEdges)
    : Replacements(Replacements)
+   , Implementses(ImplementsEdges)
 {
     // Create matchers for named declarations which are to be renamed.
-    auto ProblematicNamedDeclarations = {
-        // Basically every name-able "top-level" thing.
-        functionDecl(TUInternalTraits),
-        varDecl(TUInternalTraits),
-        recordDecl(TUInternalTraits),
-        typedefNameDecl(TUInternalTraits)
-    };
-    for (auto Matcher : ProblematicNamedDeclarations)
-        AddIDBoundMatcher<HandleDeclarations>(Matcher);
+    {
+        auto ProblematicNamedDeclarations = {
+            // Basically every name-able "top-level" thing.
+            functionDecl(TUInternalTraits),
+            varDecl(TUInternalTraits),
+            recordDecl(TUInternalTraits),
+            typedefNameDecl(TUInternalTraits)
+        };
+        for (auto Matcher : ProblematicNamedDeclarations)
+            AddIDBoundMatcher<HandleDeclarations>(Matcher);
+    }
 
     // Add a matchers that will report the usage of such a named declaration.
     {
-        auto DeclaringToRecord = hasDeclaration(recordDecl(TUInternalTraits));
-        auto DeclaringToTypedef = hasDeclaration(
-            typedefNameDecl(TUInternalTraits));
-
-        auto ProblematicDeclUsages = {
-            // Match type locations that are in the main file.
-            // (This will match, e.g. for a "const T*&", the outer type
-            // const&, the inner type T*, and the innermost type T. In case this
-            // T is a problematic symbol, a match will eventually take care of
-            // it.
-            typeLoc(isExpansionInMainFile())
-        };
-        for (auto Matcher : ProblematicDeclUsages)
-            AddIDBoundMatcher<HandleUsagePoints>("typeLoc", Matcher);
+        // Match type locations that are in the main file.
+        // (This will match, e.g. for a "const T*&", the outer type
+        // const&, the inner type T*, and the innermost type T. In case this
+        // T is a problematic symbol, a match will eventually take care of
+        // it.
+        AddIDBoundMatcher<HandleUsagePoints>("typeLoc",
+            typeLoc(isExpansionInMainFile()));
     }
     {
         auto ProblematicDeclUsages = {
@@ -252,6 +318,17 @@ MatcherFactory::MatcherFactory(const std::string& Filename,
         };
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);
+    }
+
+    // Add the matcher handle responsible for collecting what the current main
+    // file implements.
+    {
+        auto ImplementingDecls = {
+            functionDecl(TUVisibleTraits),
+            varDecl(TUVisibleTraits)
+        };
+        for (auto Matcher : ImplementingDecls)
+            AddIDBoundMatcher<HandleFindingImplementsRelation>(Matcher);
     }
 }
 
@@ -268,7 +345,7 @@ MatchFinder& MatcherFactory::operator()() { return TheFinder; }
 template <class Handler>
 MatchFinder::MatchCallback* MatcherFactory::CreateCallback()
 {
-    Callbacks.push_back(new Handler{this->Replacements});
+    Callbacks.push_back(new Handler{this->Replacements, this->Implementses});
     return Callbacks.back();
 }
 

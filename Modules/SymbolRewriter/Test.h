@@ -7,19 +7,23 @@
 #include <gtest/gtest.h>
 
 #include "Executor.h"
+#include "ImplementsEdges.h"
 #include "Replacement.h"
 
 using namespace SymbolRewriter;
 
 extern std::vector<std::string> TrivialCompileCommand;
 
-typedef std::unique_ptr<FileReplaceDirectives> UsableResult;
-
 /**
- * Helper function that fetches the actual result from the variant returned
- * by ExecuteTool(). The function test-asserts that the Tool run properly.
+ * Helper function that fetches the actual result of rewrites/replacements
+ * from the variant returned by ExecuteTool().
  */
-UsableResult getReplacementsForCompilation(
+std::unique_ptr<FileReplaceDirectives> getReplacementsForCompilation(
+    const FileMap& FileMap,
+    const std::string& Filename,
+    const std::vector<std::string>& CompileCommand);
+
+std::unique_ptr<ImplementsEdges> getImplementsRelationForCompilation(
     const FileMap& FileMap,
     const std::string& Filename,
     const std::vector<std::string>& CompileCommand);

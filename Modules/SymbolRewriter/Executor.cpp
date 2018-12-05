@@ -8,6 +8,7 @@
 #include <clang/Tooling/Tooling.h>
 #include <llvm/Support/Path.h>
 
+#include "ImplementsEdges.h"
 #include "Replacement.h"
 #include "TheFinder.h"
 
@@ -21,8 +22,7 @@ ToolExecution::ToolExecution(clang::tooling::CompilationDatabase& CompDb,
                              std::string Filepath)
     : Compilations(CompDb)
     , Filepath(std::move(Filepath))
-{
-}
+{}
 
 ToolResult ToolExecution::operator()()
 {
@@ -63,7 +63,8 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
     ClangTool Tool(CompDb, {Filepath});
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         Filepath, stem(Filepath));
-    MatcherFactory Factory{Filepath, *Replacements};
+    auto Implementses = std::make_unique<ImplementsEdges>(Filepath);
+    MatcherFactory Factory{*Replacements, *Implementses};
 
     std::cout << "Running for '" << Filepath << "'..." << std::endl;
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
@@ -73,7 +74,7 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
                   << " for " << Filepath << std::endl;
         return Result;
     }
-    return std::move(Replacements);
+    return std::make_pair(std::move(Replacements), std::move(Implementses));
 }
 
 ToolResult ExecuteTool(const FileMap& FileMap,
@@ -89,7 +90,6 @@ ToolResult ExecuteTool(const FileMap& FileMap,
 
     std::unique_ptr<FixedCompilationDatabase> CompDb;
     {
-        // HACK: Clang wants to int& to this...
         auto Argc = static_cast<int>(Argv.size());
         std::string LoadError;
         CompDb = FixedCompilationDatabase::loadFromCommandLine(
@@ -108,7 +108,8 @@ ToolResult ExecuteTool(const FileMap& FileMap,
         Tool.mapVirtualFile(e.first, e.second);
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         SourceName, stem(SourceName));
-    MatcherFactory Factory{SourceName, *Replacements};
+    auto Implementses = std::make_unique<ImplementsEdges>(SourceName);
+    MatcherFactory Factory{*Replacements, *Implementses};
 
     std::cout << "Running for '" << SourceName << "'..." << std::endl;
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
@@ -118,7 +119,7 @@ ToolResult ExecuteTool(const FileMap& FileMap,
                   << " for " << SourceName << std::endl;
         return Result;
     }
-    return std::move(Replacements);
+    return std::make_pair(std::move(Replacements), std::move(Implementses));
 }
 
 } // namespace SymbolRewriter

@@ -7,6 +7,7 @@
 #include <llvm/Support/FileSystem.h>
 
 #include "Executor.h"
+#include "ImplementsEdges.h"
 #include "Replacement.h"
 #include "threadpool.h"
 
@@ -21,15 +22,12 @@ using namespace whisperity;
  */
 int main(int argc, const char** argv)
 {
-    if (argc < 2 || argc > 4)
+    if (argc < 2 || argc > 3)
     {
-        // TODO: The output for "implements" is not used.
-        // FIXME: Noone says anything about the threadcount argument.
         std::cerr << "usage: " << argv[0] <<
-                  " <build folder> [output for 'implements' relation]" <<
+                  " <build folder> [thread count]" <<
                   std::endl;
-        std::cerr << "\t'implements' relation output will be written in the "
-                     "build folder by default." << std::endl;
+        std::cerr << "\t'thread-count' will be 1 by default." << std::endl;
         return 2;
     }
 
@@ -49,14 +47,9 @@ int main(int argc, const char** argv)
         return 1;
     }
 
-    std::string OutputPath = BuildFolder.str() + "/implements.dat";
     size_t ThreadCount = 1;
-
     if (argc >= 3)
-        OutputPath = argv[2];
-
-    if (argc >= 4)
-        ThreadCount = std::stoull(argv[3]);
+        ThreadCount = std::stoull(argv[2]);
 
     // ------------------------- Initialise the system -------------------------
     std::unique_ptr<CompilationDatabase> CompDb;
@@ -76,7 +69,7 @@ int main(int argc, const char** argv)
     auto Threading = make_thread_pool<ToolExecution>(ThreadCount,
         [](auto& Execution)
         {
-            auto ToolResult = Execution();
+            ToolResult ToolResult = Execution();
             if (int* RetCode = std::get_if<int>(&ToolResult))
             {
                 std::cerr << "Error! Non-zero return code from Clang on file "
@@ -84,21 +77,39 @@ int main(int argc, const char** argv)
                           << std::endl;
                 return;
             }
-            auto Results = std::move(
-                std::get<std::unique_ptr<FileReplaceDirectives>>(ToolResult));
+            auto Results = std::get<UsefulResultType>(std::move(ToolResult));
 
-
-            std::string ReplacementFile = Execution.filepathWithoutExtension()
-                .append(Execution.extension()).append("-symbols.txt");
-            std::ofstream Output{ReplacementFile};
-            if (Output.fail())
             {
-                std::cerr << "Can't write output for '" << Execution.filepath()
-                          << "' to file '" << ReplacementFile
-                          << "' because the file never opened." << std::endl;
-                return;
+                std::string OutputFile =
+                    Execution.filepathWithoutExtension()
+                    .append(Execution.extension())
+                    .append("-symbols.txt");
+                std::ofstream OutputBuffer{OutputFile};
+                if (OutputBuffer.fail())
+                    std::cerr << "Can't write output for '"
+                              << Execution.filepath()
+                              << "' to file '" << OutputFile
+                              << "' because the file never opened."
+                              << std::endl;
+                else
+                    writeReplacementOutput(OutputBuffer, *Results.first);
             }
-            writeReplacementOutput(Output, *Results);
+
+            {
+                std::string OutputFile =
+                    Execution.filepathWithoutExtension()
+                        .append(Execution.extension())
+                        .append("-implements.txt");
+                std::ofstream OutputBuffer{OutputFile};
+                if (OutputBuffer.fail())
+                    std::cerr << "Can't write output for '"
+                              << Execution.filepath()
+                              << "' to file '" << OutputFile
+                              << "' because the file never opened."
+                              << std::endl;
+                else
+                    writeImplementsOutput(OutputBuffer, *Results.second);
+            }
         });
 
     // ---------------------- Execute the FrontendActions ----------------------

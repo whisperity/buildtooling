@@ -308,7 +308,14 @@ def _parallel(cycle, module_map, dependency_map):
     files = dependency_map.get_files_creating_dependency_between(module_A,
                                                                  module_B)
     for file_in_A, files_in_B in sorted(files.items()):
-      files[file_in_A] = sorted(files_in_B)
+      # Cast away the dependency's "kind" value.
+      files[file_in_A] = sorted(t[0] for t in files_in_B if t[1] == 'uses')
+      if not files[file_in_A]:
+        # If the file on the left side (file_in_A) does not participate in
+        # dependency resolution because it doesn't uses-depend on anything,
+        # skip it.
+        continue
+
       print("    %s:" % file_in_A)
       print("        %s" % '\n        '.join(files[file_in_A]))
       cycle_file_graph.add_edges_from(zip(

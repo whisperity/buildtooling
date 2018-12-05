@@ -12,7 +12,7 @@ std::vector<std::string> TrivialCompileCommand = {
     "main.o"
 };
 
-UsableResult getReplacementsForCompilation(
+std::unique_ptr<FileReplaceDirectives> getReplacementsForCompilation(
     const FileMap& FileMap,
     const std::string& Filename,
     const std::vector<std::string>& CompileCommand)
@@ -20,7 +20,18 @@ UsableResult getReplacementsForCompilation(
     ToolResult Result = ExecuteTool(FileMap, Filename, CompileCommand);
     if (std::get_if<int>(&Result))
         return nullptr;
-    return std::move(std::get<UsableResult>(Result));
+    return std::move(std::get<UsefulResultType>(std::move(Result)).first);
+}
+
+std::unique_ptr<ImplementsEdges> getImplementsRelationForCompilation(
+    const FileMap& FileMap,
+    const std::string& Filename,
+    const std::vector<std::string>& CompileCommand)
+{
+    ToolResult Result = ExecuteTool(FileMap, Filename, CompileCommand);
+    if (std::get_if<int>(&Result))
+        return nullptr;
+    return std::move(std::get<UsefulResultType>(std::move(Result)).second);
 }
 
 bool positionFound(
