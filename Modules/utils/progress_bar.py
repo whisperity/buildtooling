@@ -37,3 +37,6 @@ except ImportError:
 
   print("Python library 'tqdm' not found, no progress will be printed.",
         file=sys.stderr)
+
+
+__all__ = ['tqdm']
