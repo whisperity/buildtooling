@@ -8,6 +8,10 @@ STAGE_NAME = "Write module CPPM files"
 
 
 def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
+  # Make sure the module-to-module import directives are in the dependency map,
+  # as this stage operates based on them.
+  DEPENDENCY_MAP.synthesize_intermodule_imports()
+
   # After the modules has been split up, commit the changes to the file system
   # for the upcoming operations.
   mapping.write_module_mapping(START_FOLDER, MODULE_MAP)

@@ -25,6 +25,10 @@ def substitute_module_macro(name):
          "export module FULL_NAME_" + name + ";\n"
 
 
+def substitute_module_import(name):
+  return "import MODULE_NAME_" + name + ";\n"
+
+
 class ModuleMapping():
   """
   A module mapping contains the list of fragment files, inclusion directives
@@ -470,6 +474,11 @@ def write_module_mapping(srcdir, module_map):
 
     with open(backing_file, 'w') as f:
       f.writelines([substitute_module_macro(module), '\n', '\n'])
+
+      for module_dependency in sorted(
+            module_map.get_dependencies_of_module(module)):
+        f.write(substitute_module_import(module_dependency))
+
       for frag in fragments:
         frag = os.path.join(srcdir, frag)
         frag = strip_folder(os.path.dirname(backing_file), frag)

@@ -19,14 +19,20 @@ ExecutionStepWrapper.register_global(
 
 # ---------------------- Sanity check invocation of tool ----------------------
 
-if len(sys.argv) != 2:
+if len(sys.argv) != 3:
   print("Error: Please specify a 'compile_commands.json' file for the "
-        "project!", file=sys.stderr)
+        "project! (As 1st argument.)", file=sys.stderr)
+  print("Error: Please specify the 'Modules.cmake' deploy's location for the "
+        "project! (As 2nd argument.)", file=sys.stderr)
   sys.exit(2)
 
 COMPILE_COMMAND_JSON = os.path.abspath(sys.argv[1])
 ExecutionStepWrapper.register_global('COMPILE_COMMAND_JSON',
                                      COMPILE_COMMAND_JSON)
+
+MODULES_CMAKE_SCRIPT = os.path.abspath(sys.argv[2])
+ExecutionStepWrapper.register_global('MODULES_CMAKE_SCRIPT',
+                                     MODULES_CMAKE_SCRIPT)
 
 START_FOLDER = os.getcwd()
 ExecutionStepWrapper.register_global('START_FOLDER',
@@ -67,3 +73,5 @@ ExecutionStepWrapper.execute_stage('write_module_files')
 
 # Execute some cleanup and fix stages.
 ExecutionStepWrapper.execute_stage('rename_conflicting_symbols')
+
+ExecutionStepWrapper.execute_stage('emit_cmake_module_directives')
