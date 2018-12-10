@@ -3,18 +3,18 @@
 TEST(MatchProblematicDeclarations, OnEmptyFile)
 {
     FileMap map = {
-        {"main.cpp", ""}
+        {"/main.cpp", ""}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     ASSERT_EQ(FRD->getReplacementPositions().size(), 0);
 }
 
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleTypedef)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     typedef int MyIntType;
@@ -23,7 +23,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -33,7 +33,7 @@ namespace
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleRecord)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     struct S {};
@@ -42,7 +42,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -52,7 +52,7 @@ namespace
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleGlobalVar)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     int i;
@@ -61,7 +61,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -71,7 +71,7 @@ namespace
 TEST(MatchProblematicDeclarations, InAnonymousNSSingleFunction)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     void f() {}
@@ -80,7 +80,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -90,14 +90,14 @@ namespace
 TEST(MatchProblematicDeclarations, StaticGlobalVar)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 static int i;
 extern int i2; // This should not match as the global name 'i2' has linkage.
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -108,13 +108,13 @@ extern int i2; // This should not match as the global name 'i2' has linkage.
 TEST(MatchProblematicDeclarations, StaticFunction)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 static void f() {}
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -124,7 +124,7 @@ static void f() {}
 TEST(MatchProblematicDeclarations, MultiSymbolOneMatches)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace X
 {
     typedef int T;
@@ -134,7 +134,7 @@ namespace X
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -148,7 +148,7 @@ TEST(MatchProblematicDeclarations, MultiSymbolManyMatches)
     // and only in the current file? (Concatenating two files like this would
     // constitute a TU-redefinition of the struct which is a compile error!)
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace X
 {
     typedef int T;
@@ -159,7 +159,7 @@ namespace X
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -171,17 +171,17 @@ namespace X
 TEST(MatchProblematicDeclarations_WithHeaders, SingleTypedefInHeader)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 typedef int T;
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -191,20 +191,20 @@ typedef int T;
 TEST(MatchProblematicDeclarations_WithHeaders, SingleTypedefInHeaderNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     typedef int T;
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -214,17 +214,17 @@ namespace X
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeader)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 extern int i;
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -234,20 +234,20 @@ extern int i;
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeaderNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     extern int i;
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -257,19 +257,19 @@ namespace X
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeader_Alloc)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 extern int i;
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 int i = 4;
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -279,22 +279,22 @@ int i = 4;
 TEST(MatchProblematicDeclarations_WithHeaders, SingleVariableInHeaderNS_Alloc)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     extern int i;
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 int X::i = 4;
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -304,17 +304,17 @@ int X::i = 4;
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeader)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 void f();
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -324,20 +324,20 @@ void f();
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeaderNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     void f();
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -347,19 +347,19 @@ namespace X
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeader_Defined)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 void f();
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 void f() { return; }
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -369,22 +369,22 @@ void f() { return; }
 TEST(MatchProblematicDeclarations_WithHeaders, SingleFunctionInHeaderNS_Defined)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     void f();
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 void X::f() { return; }
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -394,19 +394,19 @@ void X::f() { return; }
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleTypedef)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 typedef int T;
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 typedef long U;
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -417,22 +417,22 @@ typedef long U;
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleTypedefInNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     typedef int T;
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 typedef X::T U;
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -443,19 +443,19 @@ typedef X::T U;
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleVariable)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 extern int i;
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 static long l = 8;
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -466,22 +466,22 @@ static long l = 8;
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleVariableInNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     extern int i;
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 static long l = 8;
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -492,12 +492,12 @@ static long l = 8;
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleVariable_Alloc)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 extern int i;
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 int i = 4;
 static long l = 8;
@@ -505,7 +505,7 @@ static long l = 8;
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -517,15 +517,15 @@ TEST(MatchProblematicDeclarations_WithHeaders_AndALocal,
      SingleVariableInNS_Alloc)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     extern int i;
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 int X::i = 4;
 static long l = 8;
@@ -533,7 +533,7 @@ static long l = 8;
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -544,19 +544,19 @@ static long l = 8;
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleFunction)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 void f();
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 static void g();
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -567,22 +567,22 @@ static void g();
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleFunctionInNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     void f();
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 static void g();
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -593,12 +593,12 @@ static void g();
 TEST(MatchProblematicDeclarations_WithHeaders_AndALocal, SingleFunction_Defined)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 void f();
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 void f() { return; }
 
@@ -607,7 +607,7 @@ static int g() { return 2; }
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -619,15 +619,15 @@ TEST(MatchProblematicDeclarations_WithHeaders_AndALocal,
      SingleFunctionInNS_Defined)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     void f();
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 void X::f() { return; }
 
@@ -636,7 +636,7 @@ static int g() { return 4; }
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -648,7 +648,7 @@ TEST(MatchProblematicDeclarations_WithHeaders_AndALocal,
      SingleFunction_TypesInNS)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     typedef int I;
@@ -656,15 +656,15 @@ namespace X
 }
 )FILE"},
 
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 static void d(X::I i, X::L l) {}
 )FILE"}
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -676,7 +676,7 @@ static void d(X::I i, X::L l) {}
 TEST(MatchProblematicDeclarations_WithForwardDecl, Function)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     long l();
@@ -693,7 +693,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -704,7 +704,7 @@ namespace
 TEST(MatchProblematicDeclarations_InInnerScope, Typedef)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 typedef int I;
 
 int main()
@@ -718,7 +718,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -730,7 +730,7 @@ int main()
 TEST(MatchProblematicDeclarations_InInnerScope, Record)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 int main()
 {
     struct S { int x; };
@@ -743,7 +743,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -754,7 +754,7 @@ int main()
 TEST(MatchProblematicDeclarations_InnerScope, Lambda)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 int main()
 {
     auto lambda = [](int i) { return 2 + i; };
@@ -767,7 +767,7 @@ int main()
     // The lambda's type and implementation does not have a visible name so
     // it should not be renamed, neither the lambda ()'s variable.
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);
@@ -776,7 +776,7 @@ int main()
 TEST(MatchProblematicDeclarations_InnerScope, GenericLambda)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 int main()
 {
     auto lambda = [](auto&& i) { return 2 + i; };
@@ -789,7 +789,7 @@ int main()
     // The lambda's type and implementation does not have a visible name so
     // it should not be renamed, neither the lambda ()'s variable.
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 0);

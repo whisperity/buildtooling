@@ -24,6 +24,13 @@ add_custom_target(ClangHeaders
 link_directories(${LLVM_LIBRARY_DIRS} ${CLANG_LIBRARY_DIRS})
 set(CMAKE_BUILD_RPATH ${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS} ${CLANG_DEFINITIONS})
+
+if(NOT ${LLVM_ENABLE_RTTI})
+  # Need to disable RTTI in the client project in case dependency doesn't have
+  # it either.
+  add_compile_options(-fno-rtti)
+endif()
+
 set(LLVM_LIBRARIES_USED "")
 list(APPEND LLVM_LIBRARIES_USED
     clang
@@ -48,30 +55,35 @@ target_link_libraries(SymbolRewriter
     pthread)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    enable_testing()
     find_package(GTest)
+    if (NOT ${GTEST_FOUND})
+      message(WARNING "Debug build was enabled but GoogleTest library not"
+                      "found.")
+    else()
+      enable_testing()
 
-    include_directories(SYSTEM
-        ${GTEST_INCLUDE_DIRS})
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-    add_executable(RewriteTest
-        Test.cpp
-        tests/DeclarationRewriting.cpp
-        tests/ImplementsWriting.cpp
-        tests/ImplementsRelation.cpp
-        tests/MatchProblematicDeclarations.cpp
-        tests/RenameWriting.cpp
-        tests/UsagePoints.cpp)
-    target_link_libraries(RewriteTest
-        RewritingTool
-        ${GTEST_BOTH_LIBRARIES}
-        ${LLVM_LIBRARIES_USED}
-        pthread)
+      include_directories(SYSTEM
+          ${GTEST_INCLUDE_DIRS})
+      include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+      add_executable(RewriteTest
+          Test.cpp
+          tests/DeclarationRewriting.cpp
+          tests/ImplementsWriting.cpp
+          tests/ImplementsRelation.cpp
+          tests/MatchProblematicDeclarations.cpp
+          tests/RenameWriting.cpp
+          tests/UsagePoints.cpp)
+      target_link_libraries(RewriteTest
+          ${GTEST_BOTH_LIBRARIES}
+          RewritingTool
+          ${LLVM_LIBRARIES_USED}
+          pthread)
 
-    add_test(
-        NAME RewriteTest
-        COMMAND RewriteTest)
-    add_custom_target(check
-        COMMAND ${CMAKE_CTEST_COMMAND}
-        DEPENDS RewriteTest)
+      add_test(
+          NAME RewriteTest
+          COMMAND RewriteTest)
+      add_custom_target(check
+          COMMAND ${CMAKE_CTEST_COMMAND}
+          DEPENDS RewriteTest)
+    endif()
 endif()

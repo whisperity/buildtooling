@@ -3,7 +3,7 @@
 TEST(RewriteUsagePoints, Typedef)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 typedef int I;
 
 int main()
@@ -15,7 +15,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -26,7 +26,7 @@ int main()
 TEST(RewriteUsagePoints, LocalRecord)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     struct S
@@ -45,7 +45,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -57,7 +57,7 @@ int main()
 TEST(RewriteUsagePoints, FunctionCall)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     int f()
@@ -74,7 +74,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -85,7 +85,7 @@ int main()
 TEST(RewriteUsagePoints, FunctionCallWithLocalType)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 typedef int I;
 
 namespace
@@ -104,7 +104,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 4);
@@ -117,7 +117,7 @@ int main()
 TEST(RewriteUsagePoints, LocalTypesInArgumentList)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 typedef int I;
 typedef long L;
 
@@ -135,7 +135,7 @@ static void f(I i, L l, I& ir, L& lr, I* ip, L* lp, I** ipp,
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 21);
@@ -169,7 +169,7 @@ static void f(I i, L l, I& ir, L& lr, I* ip, L* lp, I** ipp,
 TEST(RewriteUsagePoints, Variable)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     long l = 42l;
@@ -183,7 +183,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -194,7 +194,7 @@ int main()
 TEST(RewriteUsagePoints, LocalVariableOfProblematicType)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 typedef int I;
 
 int main()
@@ -212,7 +212,7 @@ int main()
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 9);
@@ -230,7 +230,7 @@ int main()
 TEST(RewriteUsagePoints, QualifiedGlobalVariable)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 typedef int I;
 
 static const I* cip;
@@ -238,7 +238,7 @@ static const I* cip;
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 3);
@@ -250,14 +250,14 @@ static const I* cip;
 TEST(RewriteUsagePoints, GlobalVariableWithTypedefFromHeader)
 {
     FileMap map = {
-        {"header.h", R"FILE(
+        {"/header.h", R"FILE(
 namespace X
 {
     typedef int I;
 }
 )FILE"},
-        {"main.cpp", R"FILE(
-#include "header.h"
+        {"/main.cpp", R"FILE(
+#include "/header.h"
 
 typedef long L;
 
@@ -267,7 +267,7 @@ static const    L* clp;
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 4);
@@ -281,7 +281,7 @@ static const    L* clp;
 TEST(RewriteUsagePoints, StaticGenericLambda)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 static auto lambda = [](auto&& i) { return 2 + i; };
 
 int main()
@@ -294,7 +294,7 @@ int main()
     // The lambda's type does not have a visible name so it should not be
     // renamed. Neither should the variable of the lambda's function.
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);

@@ -3,7 +3,7 @@
 TEST(DeclarationRewriting, SimpleTypedef)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     typedef int MyIntType;
@@ -12,7 +12,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -22,7 +22,7 @@ namespace
 TEST(DeclarationRewriting, SimpleFunction)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     long f() { return 0; }
@@ -31,7 +31,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -41,7 +41,7 @@ namespace
 TEST(DeclarationRewriting_AnotherFilename, SimpleFunction)
 {
     FileMap map = {
-        {"foo.cpp", R"FILE(
+        {"/foo.cpp", R"FILE(
 namespace
 {
     long f() { return 0; }
@@ -50,7 +50,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "foo.cpp", TrivialCompileCommand);
+        map, "/foo.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -60,7 +60,7 @@ namespace
 TEST(DeclarationRewriting, SimpleFunctionWithPrototype)
 {
     FileMap map = {
-        {"main.cpp", R"FILE(
+        {"/main.cpp", R"FILE(
 namespace
 {
     long l();
@@ -77,7 +77,7 @@ namespace
     };
 
     auto FRD = getReplacementsForCompilation(
-        map, "main.cpp", TrivialCompileCommand);
+        map, "/main.cpp", TrivialCompileCommand);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);

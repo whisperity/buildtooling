@@ -137,7 +137,7 @@ public:
 private:
     void HandleTypeLoc(const TypeLoc* Loc, const SourceManager& SM)
     {
-        const SourceLocation& SLoc = SM.getSpellingLoc(Loc->getLocStart());
+        const SourceLocation& SLoc = SM.getSpellingLoc(Loc->getBeginLoc());
         std::string Filename = SM.getFilename(SLoc);
         if (SLoc.isInvalid())
             return;
@@ -247,7 +247,7 @@ public:
             return;
 
         const SourceManager& SM = PD->getASTContext().getSourceManager();
-        const SourceLocation& SLoc = SM.getSpellingLoc(PD->getLocStart());
+        const SourceLocation& SLoc = SM.getSpellingLoc(PD->getBeginLoc());
         std::string Filename = SM.getFilename(SLoc);
         if (SLoc.isInvalid())
             return;

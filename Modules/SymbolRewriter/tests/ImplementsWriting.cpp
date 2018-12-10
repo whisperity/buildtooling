@@ -8,11 +8,11 @@
 using namespace SymbolRewriter;
 
 /**
- * Get a dummy implements edge wrapper for a "main.cpp" file.
+ * Get a dummy implements edge wrapper for a "/main.cpp" file.
  */
 ImplementsEdges getIE()
 {
-    return ImplementsEdges{"main.cpp"};
+    return ImplementsEdges{"/main.cpp"};
 }
 
 std::string getEdgesAsString(const ImplementsEdges& IE)
@@ -30,20 +30,20 @@ TEST(ImplementsEdgeWriting, Empty)
 TEST(ImplementsEdgeWriting, Single)
 {
     auto IE = getIE();
-    IE.AddImplemented("header.h", "?");
+    IE.AddImplemented("/header.h", "?");
 
     ASSERT_EQ(getEdgesAsString(IE),
-              "main.cpp##header.h##?\n");
+              "/main.cpp##/header.h##?\n");
 }
 
 TEST(ImplementsEdgeWriting, Multiple)
 {
     auto IE = getIE();
-    IE.AddImplemented("header.h", "X");
+    IE.AddImplemented("/header.h", "X");
     IE.AddImplemented("/usr/include/foo.h", "foo::bar");
 
-    std::string Expected = R"BUF(main.cpp##/usr/include/foo.h##foo::bar
-main.cpp##header.h##X
+    std::string Expected = R"BUF(/main.cpp##/header.h##X
+/main.cpp##/usr/include/foo.h##foo::bar
 )BUF";
 
     ASSERT_EQ(getEdgesAsString(IE), Expected);

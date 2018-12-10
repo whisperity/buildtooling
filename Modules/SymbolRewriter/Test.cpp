@@ -7,9 +7,9 @@ std::vector<std::string> TrivialCompileCommand = {
     "/usr/bin/c++",
     "-std=c++14",
     "-c",
-    "main.cpp",
+    "/main.cpp",
     "-o",
-    "main.o"
+    "/main.o"
 };
 
 std::unique_ptr<FileReplaceDirectives> getReplacementsForCompilation(

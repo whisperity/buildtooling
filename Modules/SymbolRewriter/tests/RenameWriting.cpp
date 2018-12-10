@@ -10,11 +10,11 @@ using namespace SymbolRewriter;
 #define ADDR(x) reinterpret_cast<const void *>(x)
 
 /**
- * Get a dummy replacer for a "main.cpp" file.
+ * Get a dummy replacer for a "/main.cpp" file.
  */
 FileReplaceDirectives getFRD()
 {
-    return FileReplaceDirectives{"main.cpp", "main"};
+    return FileReplaceDirectives{"/main.cpp", "main"};
 }
 
 std::string getReplacementsAsString(const FileReplaceDirectives& FRD)
@@ -36,7 +36,7 @@ TEST(RenameWriting, Single)
     FRD.AddReplacementPosition(1, 1, "Foo", nullptr);
 
     ASSERT_EQ(getReplacementsAsString(FRD),
-              "main.cpp##1:1##Foo##main_Foo\n");
+              "/main.cpp##1:1##Foo##main_Foo\n");
 }
 
 TEST(RenameWriting, Multiple)
@@ -52,10 +52,10 @@ TEST(RenameWriting, Multiple)
     // but not a usual case.
     FRD.AddReplacementPosition(8, 20, "Foo", ADDR(2));
 
-    std::string Expected = R"BUF(main.cpp##1:1##Foo##main_Foo
-main.cpp##2:1##Foo##main_Foo
-main.cpp##4:1##Bar##main_Bar
-main.cpp##8:20##Foo##main_Bar
+    std::string Expected = R"BUF(/main.cpp##1:1##Foo##main_Foo
+/main.cpp##2:1##Foo##main_Foo
+/main.cpp##4:1##Bar##main_Bar
+/main.cpp##8:20##Foo##main_Bar
 )BUF";
 
     ASSERT_EQ(getReplacementsAsString(FRD), Expected);
