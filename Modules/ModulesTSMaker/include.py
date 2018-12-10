@@ -48,9 +48,9 @@ def filter_imports_from_includes(filename,
 
   # Rearrange the include statements so all of them are on the top, and for
   # easier rewriting to "import", in alphabetical order.
+  original_lines = text.splitlines(True)
   include_lines, other_lines = partition(
-    lambda line: not line.startswith("#include"),
-    text.splitlines(True))
+    lambda line: not line.startswith("#include"), original_lines)
   include_lines = list(sorted(include_lines))
   if not include_lines:
     # If the file contains no "#include" statements, no need to do anything.
@@ -77,9 +77,27 @@ def filter_imports_from_includes(filename,
         tqdm.write("%s: Include file '%s' not found in module mapping."
                    % (filename, original_included),
                    file=sys.stderr)
-        lines_to_keep.append(line.strip())
+        lines_to_keep.append(line)
         continue
 
     dependency_map.add_dependency(filename, included, 'uses')
 
-  return ''.join(other_lines)
+  def _keep_line(line):
+    """
+    Predicate to check if :param line: is to be kept in the file once the
+    dependencies had been synthesised from it.
+    """
+    if line in other_lines:
+      # Every line that is not an include line is kept.
+      return True
+    if line in include_lines:
+      # For lines that are include statements, only keep them if we marked them
+      # for keeping earlier.
+      return line in lines_to_keep
+
+    # Lines we don't know nothing about should be kept too.
+    return True
+
+  final_lines = filter(_keep_line, original_lines)
+
+  return ''.join(final_lines)

@@ -28,4 +28,15 @@ def main(MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
     new_text = include.filter_imports_from_includes(
       file, content, MODULE_MAP, DEPENDENCY_MAP)
 
-    # TODO: What to do with this 'new_text'? We should write it to the FS...
+    if not new_text:
+      # If no includes had been removed from the file, there is no change to do
+      # and thus new_text is None.
+      continue
+
+    try:
+      with codecs.open(file, 'w', encoding='utf-8', errors='replace') as f:
+        f.write(new_text)
+    except OSError as e:
+      tqdm.write("Couldn't write file '%s': %s" % (file, e),
+                 file=sys.stderr)
+      continue
