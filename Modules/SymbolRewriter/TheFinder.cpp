@@ -1,6 +1,7 @@
 #include "TheFinder.h"
 
 #include <clang/AST/DeclCXX.h>
+#include <llvm/ADT/Twine.h>
 
 #include "ImplementsEdges.h"
 #include "Replacement.h"
@@ -44,8 +45,7 @@ auto ExternallyNamedButImplementedInTheTU = namedDecl(
  */
 auto InSomeGlobalishScope = anyOf(
     hasParent(translationUnitDecl()),
-    hasParent(namespaceDecl())
-);
+    hasParent(namespaceDecl()));
 
 /**
  * Renaming such TU-Internal declarations is enough to break ambiguity.
@@ -259,14 +259,30 @@ public:
             // can happen if e.g. someone put a forward declaration after
             // another one, and before the main definition.
             return;
-        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
-            // If the declaration hasn't a name, it cannot be renamed.
-            return;
+
+        // Try fetching the Decl's name from either the identifier (if it is
+        // identifiable), or through other means (e.g. for operator+,
+        // operator new).
+        std::string DeclName;
+        if (ND->getDeclName().isIdentifier())
+            DeclName = ND->getName().str();
+        else
+            DeclName = ND->getDeclName().getAsString();
+
+        if (DeclName.empty())
+        {
+            // If the name could not had been fetched, create a dummy symbol
+            // name.
+            using llvm::Twine;
+            unsigned int Line = SM.getSpellingLineNumber(SLoc);
+            unsigned int Column = SM.getSpellingColumnNumber(SLoc);
+            DeclName = (Twine("unnameable_decl_at__") + Twine(Line) +
+                "_" + Twine(Column)).str();
+        }
 
         // Note: Declaration chains need not be walked transitively, because the
         // matcher matches on every declaration.
-
-        Implementses.AddImplemented(Filename, ND->getName().str());
+        Implementses.AddImplemented(Filename, DeclName);
     }
 
 private:
