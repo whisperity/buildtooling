@@ -195,7 +195,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
             # *another* different module.
             # This won't fix the cycles either, but will make the next
             # iteration work with a much smaller graph.
-            files_to_move[new_move_candidate] = _get_new_module_name(
+            files_to_move[new_move_candidate] = get_new_module_name(
               module_map, [new_move_candidate])
           else:
             # The move candidate is part of a path between the insolvent
@@ -243,7 +243,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
       lambda e: e[0],
       filter(lambda e: e[1] is None,
              files_to_move.items())))
-  new_module_name = _get_new_module_name(
+  new_module_name = get_new_module_name(
     module_map, sorted(files_moving_without_new_module_name))
   for file in files_moving_without_new_module_name:
     files_to_move[file] = new_module_name
@@ -254,11 +254,15 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   return files_to_move
 
 
-def _get_new_module_name(module_map, moved_files):
+def get_new_module_name(module_map, moved_files, accepted_name=None):
   """
   Given a :param module_map: this function generated a name for files in
   :param moved_files:. The new module name will be something that does not
   exist in the module map already.
+
+  If :param accepted_name: is specified and the generated name would match
+  :param accepted_name:, the same value is returned, and no further
+  calculations are made.
   """
   if len(moved_files) == 0:
     return None
@@ -278,7 +282,7 @@ def _get_new_module_name(module_map, moved_files):
 
   digest_sublen = 7
   new_name = _get_name(digest_sublen)
-  while new_name in module_map:
+  while new_name in module_map and new_name != accepted_name:
     digest_sublen += 1
     new_name = _get_name(digest_sublen)
 

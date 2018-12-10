@@ -18,6 +18,7 @@ from utils.progress_bar import tqdm
 from . import include
 
 MODULE_MACRO = re.compile(r'FULL_NAME_(?P<name>[\w_\-\d]+)?;[\s]*$')
+MEMORY_ONLY_MODULE_BACKING_FILENAME = os.devnull
 
 
 def substitute_module_macro(name):
@@ -464,11 +465,11 @@ def write_module_mapping(srcdir, module_map):
     fragments = module_map.get_fragment_list(module)
     if not fragments:
       modules_to_delete.append(module)
-      if backing_file != os.devnull:
+      if backing_file != MEMORY_ONLY_MODULE_BACKING_FILENAME:
         os.unlink(backing_file)
       continue
 
-    if backing_file == os.devnull:
+    if backing_file == MEMORY_ONLY_MODULE_BACKING_FILENAME:
       backing_file = os.path.join(srcdir, module + '.cppm')
       module_map.set_backing_file(module, backing_file)
 
@@ -518,7 +519,7 @@ def apply_file_moves(module_map, dependency_map, moved_files):
   for filename, new_module in moved_files.items():
     module_map.remove_fragment(filename)
     if new_module not in module_map:
-      module_map.add_module(new_module, os.devnull)
+      module_map.add_module(new_module, MEMORY_ONLY_MODULE_BACKING_FILENAME)
     module_map.add_fragment(new_module, filename)
 
   for dependee, dependency, kind in dependencies_to_fix_up:
