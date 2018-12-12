@@ -474,11 +474,11 @@ def write_module_mapping(srcdir, module_map):
       module_map.set_backing_file(module, backing_file)
 
     with open(backing_file, 'w') as f:
-      f.writelines([substitute_module_macro(module), '\n', '\n'])
-
       for module_dependency in sorted(
             module_map.get_dependencies_of_module(module)):
         f.write(substitute_module_import(module_dependency))
+
+      f.writelines(['\n', substitute_module_macro(module), '\n', '\n'])
 
       for frag in fragments:
         frag = os.path.join(srcdir, frag)
