@@ -64,14 +64,26 @@ ExecutionStepWrapper.register_global('MODULE_MAP', MODULE_MAP)
 ExecutionStepWrapper.register_global('DEPENDENCY_MAP', DEPENDENCY_MAP)
 
 ExecutionStepWrapper.execute_stage('load_implements_relations')
-ExecutionStepWrapper.execute_stage('fetch_dependency_includes_from_headers')
+
+# Fetch the dependencies from the headers only.
+ExecutionStepWrapper.register_global(
+  'FILTER_FILE_REGEX', ExecutionStepWrapper.get('HEADER_FILE_REGEX'))
+ExecutionStepWrapper.execute_stage('fetch_dependency_includes')
+ExecutionStepWrapper.register_global('FILTER_FILE_REGEX', None)
 
 # Execute the stages of the algorithm and try to solve modularisation.
 ExecutionStepWrapper.execute_stage('solve_potential_module_import_cycles')
 ExecutionStepWrapper.execute_stage('move_implementation_files_to_new_modules')
-ExecutionStepWrapper.execute_stage('write_module_files')
-
-# Execute some cleanup and fix stages.
 ExecutionStepWrapper.execute_stage('rename_conflicting_symbols')
 
+# After the types had been broken up, implementation files can still have some
+# dependent headers.
+ExecutionStepWrapper.register_global(
+  'FILTER_FILE_REGEX',
+  re.compile(r'\.(C(XX|PP|\+\+)?|c(xx|pp|\+\+)?|i(xx|pp|\+\+))$'))
+ExecutionStepWrapper.execute_stage('fetch_dependency_includes')
+ExecutionStepWrapper.register_global('FILTER_FILE_REGEX', None)
+
+# Save the algorithm's output.
+ExecutionStepWrapper.execute_stage('write_module_files')
 ExecutionStepWrapper.execute_stage('emit_cmake_module_directives')

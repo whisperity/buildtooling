@@ -34,7 +34,15 @@ class ExecutionStepWrapper():
 
   @classmethod
   def register_global(cls, var, val):
+    if val is None and var in cls.cfg_globals:
+      del cls.cfg_globals[var]
+      return
+
     cls.cfg_globals[var] = val
+
+  @classmethod
+  def get(cls, var):
+    return cls.cfg_globals.get(var, None)
 
   @classmethod
   def execute_stage(cls, stage_name):
@@ -48,7 +56,7 @@ class ExecutionStepWrapper():
       if stage_name not in cls.loaded_stages:
         raise KeyError("The stage '%s' was not found." % stage_name)
 
-    # Dinamically figure out what "global" variables (state) the stage needs
+    # Dynamically figure out what "global" variables (state) the stage needs
     # based on the signature and map it from the stored globals.
     fun = cls.loaded_stages[stage_name].main
     params = inspect.signature(fun).parameters

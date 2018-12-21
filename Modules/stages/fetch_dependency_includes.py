@@ -4,19 +4,18 @@ import sys
 from ModulesTSMaker import include
 from utils.progress_bar import tqdm
 
-STAGE_NAME = "Fetch dependency \"#include\"s from headers"
+STAGE_NAME = "Fetch dependency \"#include\"s from files"
 
 
-def main(MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
-  # First look for header files and handle the include directives that a
-  # module fragment's header includes.
-  headers = list(filter(HEADER_FILE_REGEX.search,
+def main(MODULE_MAP, DEPENDENCY_MAP, FILTER_FILE_REGEX):
+  # Handle removing #include directives from files matching the given RegEx and
+  # adding them as module imports instead.
+  headers = list(filter(FILTER_FILE_REGEX.search,
                         MODULE_MAP.get_all_fragments()))
   for file in tqdm(headers,
                    desc="Collecting includes",
-                   unit='header',
+                   unit='file',
                    position=1):
-    content = None
     try:
       with codecs.open(file, 'r', encoding='utf-8', errors='replace') as f:
         content = f.read()
