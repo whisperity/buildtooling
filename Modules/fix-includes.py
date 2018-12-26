@@ -84,6 +84,8 @@ ExecutionStepWrapper.register_global(
 ExecutionStepWrapper.execute_stage('fetch_dependency_includes')
 ExecutionStepWrapper.register_global('FILTER_FILE_REGEX', None)
 
+ExecutionStepWrapper.execute_stage('join_implementation_cycles')
+
 # Save the algorithm's output.
 ExecutionStepWrapper.execute_stage('write_module_files')
 ExecutionStepWrapper.execute_stage('emit_cmake_module_directives')

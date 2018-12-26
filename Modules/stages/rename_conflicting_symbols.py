@@ -28,12 +28,12 @@ def main(START_FOLDER):
         try:
           parts = line.strip().split('##')
           filename = parts[0]
-          line, col = parts[1].split(':')
+          row, col = parts[1].split(':')
           from_str = parts[2]
           to_str = parts[3]
 
           success = utils.replace_at_position(filename,
-                                              int(line), int(col),
+                                              int(row), int(col),
                                               from_str, to_str)
           if not success:
             tqdm.write("Replacement failed for directive: %s" % line,
