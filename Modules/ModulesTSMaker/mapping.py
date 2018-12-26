@@ -603,10 +603,19 @@ def write_topological_order(module_file,
   The intramodule dependency map must contain each such files to be ordered as
   a key. If there are no dependencies, the value in the dict shall be empty, or
   empty list.
+
+  :param intramodule_dependencies: The list of dependencies, in a k -> [v]
+  format, where file k (key) depends on files in the v (value) list.
   """
   try:
-    graph = nx.DiGraph(intramodule_dependencies)
-    topological = nx.lexicographical_topological_sort(graph)
+    # Topological sort requires that dependencies are expressed in a (u, v)
+    # edge which means u depends on v. The edges created from
+    # :param intramodule_dependencies: contains the dependencies reversed, as
+    # u's dependency vs are listed, which would mean that the dependee is to
+    # appear (in topological order) before the dependency. Flipping the edges
+    # is required because of this.
+    graph = nx.DiGraph(intramodule_dependencies).reverse(True)
+    topological = nx.topological_sort(graph)
   except nx.NetworkXUnfeasible:
     print("Error! Circular dependency found in header files used in module "
           "%s. Module file cannot be rewritten!" % module_file,
