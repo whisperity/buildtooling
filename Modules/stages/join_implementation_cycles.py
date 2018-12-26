@@ -1,3 +1,4 @@
+from itertools import zip_longest
 from operator import itemgetter
 
 try:
@@ -14,7 +15,7 @@ from ModulesTSMaker import mapping
 STAGE_NAME = "Solve dependency cycles by merging graphs"
 
 
-def _fold_cycles(module_map):
+def _fold_cycles(module_map, dependency_map):
   """
   Executes the folding of cyclical dependencies into a new merged module.
 
@@ -79,41 +80,60 @@ def _fold_cycles(module_map):
     # For every cycle detected, try folding it towards the left. Each iteration
     # does one fold on every cycle.
     print("Circular dependency between modules found on the following path:\n"
-          "    %s" % ' -> '.join(cycle))
+          "    %s" % cycle[0], end='')
+
+    # Calculate the coupling strength between the modules in the cycle.
+    coupling_strength = dict()
+    for module_A, module_B in zip_longest(cycle[:-1], cycle[1:]):
+      # (E.g. iterates A -> B, B -> C, C -> A)
+      coupling_strength[module_A + ' -> ' + module_B] = 0
+      for dependencies_in_B in dependency_map.\
+            get_files_creating_dependency_between(module_A, module_B).values():
+        coupling_strength[module_A + ' -> ' + module_B] += \
+          len(dependencies_in_B)
+
+      print(" -> (%d) %s "
+            % (coupling_strength[module_A + ' -> ' + module_B], module_B),
+            end='')
+    print()
+
+    maximal_coupling_edge = max(coupling_strength, key=itemgetter(1)). \
+      split(' -> ')
+    to_merge, merge_into = maximal_coupling_edge[0], maximal_coupling_edge[1]
 
     # If a A<-B and B<-A merge is prepared (e.g. because an A->B->A and
     # B->A->B cycle exists), then moving files from B to A and then A to B
     # would just make the algorithm oscillate between two states.
-    left_module_in_rights_list = cycle[0] in modules_to_merge.get(cycle[1],
+    left_module_in_rights_list = to_merge in modules_to_merge.get(merge_into,
                                                                   list())
-    right_module_in_lefts_list = cycle[1] in modules_to_merge.get(cycle[0],
-                                                                  list())
+    right_module_in_lefts_list = merge_into in modules_to_merge.get(to_merge,
+                                                                    list())
     if left_module_in_rights_list or right_module_in_lefts_list:
       # The solution here is to create a module C which merges A and B
       # together.
-      modules_moved_together = [cycle[0], cycle[1]]
+      modules_moved_together = [to_merge, merge_into]
       dummy_name = 'intermediate_' + \
                    mapping.get_new_module_name(module_map,
                                                modules_moved_together)
       modules_to_merge[dummy_name] = modules_moved_together
 
       if left_module_in_rights_list:
-        modules_to_merge[cycle[1]].remove(cycle[0])
+        modules_to_merge[merge_into].remove(to_merge)
       if right_module_in_lefts_list:
-        modules_to_merge[cycle[0]].remove(cycle[1])
-      modules_marked_for_moving.add(cycle[0])
-      modules_marked_for_moving.add(cycle[1])
+        modules_to_merge[to_merge].remove(merge_into)
+      modules_marked_for_moving.add(to_merge)
+      modules_marked_for_moving.add(merge_into)
       continue
 
     # Don't move a module twice in the same iteration.
-    if cycle[1] in modules_marked_for_moving:
+    if to_merge in modules_marked_for_moving:
       continue
 
-    merge_list = modules_to_merge.get(cycle[0], list())
+    merge_list = modules_to_merge.get(merge_into, list())
     if not merge_list:
-      modules_to_merge[cycle[0]] = merge_list
-    merge_list.append(cycle[1])
-    modules_marked_for_moving.add(cycle[1])
+      modules_to_merge[merge_into] = merge_list
+    merge_list.append(to_merge)
+    modules_marked_for_moving.add(to_merge)
 
   return modules_to_merge
 
@@ -129,7 +149,7 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
       "========->> Begin iteration %d trying to merge cycles.. <<-========"
       % iteration_count)
 
-    modules_to_move = _fold_cycles(MODULE_MAP)
+    modules_to_move = _fold_cycles(MODULE_MAP, DEPENDENCY_MAP)
     if modules_to_move is True:
       print("Nothing to do.")
       break
