@@ -3,6 +3,7 @@ import os
 import re
 import sys
 from collections import Counter
+from hashlib import md5
 from operator import itemgetter
 
 try:
@@ -529,6 +530,41 @@ def apply_file_moves(module_map, dependency_map, moved_files):
 
   # Resynthesize the import list because file-module relations have changed.
   dependency_map.synthesize_intermodule_imports()
+
+
+def get_new_module_name(module_map, moved_files, accepted_name=None):
+  """
+  Given a :param module_map: this function generated a name for files in
+  :param moved_files:. The new module name will be something that does not
+  exist in the module map already.
+
+  If :param accepted_name: is specified and the generated name would match
+  :param accepted_name:, the same value is returned, and no further
+  calculations are made.
+  """
+  if len(moved_files) == 0:
+    return None
+
+  only_file = moved_files[0] if len(moved_files) == 1 else None
+  digest = md5(','.join(moved_files).encode('utf-8')).hexdigest()
+
+  def _get_name(sublen):
+    if sublen > len(digest):
+      raise IndexError("Hash length of %d exhausted" % len(digest))
+
+    if only_file:
+      file_name = os.path.splitext(os.path.basename(only_file))[0]
+      return "Module_%s_%s" % (digest[:sublen], file_name)
+    else:
+      return "Module_%s" % digest[:sublen]
+
+  digest_sublen = 7
+  new_name = _get_name(digest_sublen)
+  while new_name in module_map and new_name != accepted_name:
+    digest_sublen += 1
+    new_name = _get_name(digest_sublen)
+
+  return new_name
 
 
 def write_topological_order(module_file,
