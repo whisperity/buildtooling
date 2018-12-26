@@ -4,7 +4,7 @@ from ModulesTSMaker import mapping
 from utils.progress_bar import tqdm
 
 
-STAGE_NAME = "Write module CPPM files"
+PASS_NAME = "Write module CPPM files"
 
 
 def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):

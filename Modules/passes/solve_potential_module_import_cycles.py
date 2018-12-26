@@ -15,7 +15,7 @@ from ModulesTSMaker import mapping, util
 from utils import graph
 
 
-STAGE_NAME = "Solve potential module import cycles"
+PASS_NAME = "Solve potential module import cycles"
 
 
 def _create_flow_for_cycle_graph(cycle,

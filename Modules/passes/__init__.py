@@ -5,22 +5,22 @@ import sys
 
 
 PACKAGE_DIR = os.path.dirname(__file__)
-__all__ = ['ExecutionStepWrapper']
+__all__ = ['PassLoader']
 
 
-class ExecutionStepWrapper():
+class PassLoader():
   """
-  Wrapper for execution steps of the project. Takes care of binding and
-  bookkeeping configuration globals.
+  Wrapper for passes of the project. Takes care of binding and bookkeeping
+  configuration globals.
   """
 
-  loaded_stages = {}
+  loaded_passes = {}
   cfg_globals = {}
 
   @classmethod
-  def load_stage(cls, stage_name):
-    file_name = stage_name + '.py'
-    full_name = 'stages.' + stage_name
+  def load_stage(cls, pass_name):
+    file_name = pass_name + '.py'
+    full_name = 'passes.' + pass_name
     module_path = os.path.join(PACKAGE_DIR, file_name)
 
     # Try loading the module dynamically.
@@ -30,7 +30,7 @@ class ExecutionStepWrapper():
     spec.loader.exec_module(loaded_module)
 
     sys.modules[full_name] = loaded_module
-    cls.loaded_stages[stage_name] = loaded_module
+    cls.loaded_passes[pass_name] = loaded_module
 
   @classmethod
   def register_global(cls, var, val):
@@ -45,20 +45,20 @@ class ExecutionStepWrapper():
     return cls.cfg_globals.get(var, None)
 
   @classmethod
-  def execute_stage(cls, stage_name):
+  def execute_pass(cls, pass_name):
     """
-    Executes the stage named :param stage_name:. This call will implicity load
-    the stage's module and the execution will get the "globals" registered to
-    this class at the moment of calling execute_stage().
+    Executes the pass named :param pass_name:. This call will implicitly load
+    the pass' module and the execution will get the "globals" registered to
+    this class at the moment of calling execute_pass().
     """
-    if stage_name not in cls.loaded_stages:
-      cls.load_stage(stage_name)
-      if stage_name not in cls.loaded_stages:
-        raise KeyError("The stage '%s' was not found." % stage_name)
+    if pass_name not in cls.loaded_passes:
+      cls.load_stage(pass_name)
+      if pass_name not in cls.loaded_passes:
+        raise KeyError("The stage '%s' was not found." % pass_name)
 
     # Dynamically figure out what "global" variables (state) the stage needs
     # based on the signature and map it from the stored globals.
-    fun = cls.loaded_stages[stage_name].main
+    fun = cls.loaded_passes[pass_name].main
     params = inspect.signature(fun).parameters
     globals_needed_by_params = dict(
       filter(lambda e: e[0] in params, cls.cfg_globals.items()))

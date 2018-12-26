@@ -4,7 +4,7 @@ import sys
 from ModulesTSMaker import include
 from utils.progress_bar import tqdm
 
-STAGE_NAME = "Fetch dependency \"#include\"s from files"
+PASS_NAME = "Fetch dependency \"#include\"s from files"
 
 
 def main(MODULE_MAP, DEPENDENCY_MAP, FILTER_FILE_REGEX):

@@ -3,7 +3,7 @@ import sys
 from ModulesTSMaker import mapping
 
 
-STAGE_NAME = "Load module mapping"
+PASS_NAME = "Load module mapping"
 
 
 def main(START_FOLDER):

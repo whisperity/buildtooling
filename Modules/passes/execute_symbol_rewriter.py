@@ -5,7 +5,7 @@ import sys
 import utils
 
 
-STAGE_NAME = "Execute SymbolRewriter"
+PASS_NAME = "Execute SymbolRewriter"
 
 
 def main(SYMBOL_REWRITER_BINARY, COMPILE_COMMAND_JSON, START_FOLDER):
