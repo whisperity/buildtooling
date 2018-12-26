@@ -27,6 +27,8 @@ def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):
         f.write("set_module(%s %s)\n"
                 % (module, MODULE_MAP.get_filename(module)))
 
+      f.write("\n")
+
       # Emit the necessary dependencies (import module statements) between
       # modules into the build graph too.
       for module in sorted(MODULE_MAP):

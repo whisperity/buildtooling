@@ -35,18 +35,19 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
     intramodule_dependencies = dict(map(lambda x: (x, []),
                                         headers_in_module))
     # Then add the list of known dependencies from the previous built map.
-    for dependee_module, dep_pair in \
-          DEPENDENCY_MAP.get_intramodule_dependencies(module).items():
+    for dependee_file, dep_pair in \
+          filter(lambda e: HEADER_FILE_REGEX.search(e[0]),
+                 DEPENDENCY_MAP.get_intramodule_dependencies(module).items()):
       dep_list = list()
       for tupl in dep_pair:
         # Remove the "kind" attribute from the dependency graph for this.
         filename, kind = tupl
-        if kind == 'uses' and HEADER_FILE_REGEX.match(filename):
+        if kind == 'uses' and HEADER_FILE_REGEX.search(filename):
           dep_list.append(filename)
       if dep_list:
         # Only save the dependency into this dict if the file partook in any
         # uses-dependency relation.
-        intramodule_dependencies[dependee_module] = sorted(dep_list)
+        intramodule_dependencies[dependee_file] = dep_list
 
     topological_success = topological_success and \
                           mapping.write_topological_order(

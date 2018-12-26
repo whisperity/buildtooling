@@ -135,6 +135,7 @@ def _fold_cycles(module_map, dependency_map):
     merge_list.append(to_merge)
     modules_marked_for_moving.add(to_merge)
 
+  print()
   return modules_to_merge
 
 

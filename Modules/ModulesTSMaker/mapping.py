@@ -617,32 +617,29 @@ def write_topological_order(module_file,
                    encoding='utf-8', errors='replace') as f:
     lines = f.readlines()
 
-    # Find the "part" of the module file where the regex-matching fragments are
-    # included.
-    # It's an invariant that first only such are included, and then only
-    # other kinds of files!
-    first_matching_include, last_matching_include = None, None
+    lines_to_keep = list()
+    includes_start_at = None
     for num, l in enumerate(lines):
       potentially_included_filename = include.directive_to_filename(l)
       if not potentially_included_filename:
         continue
 
-      if not first_matching_include and \
-            regex.search(potentially_included_filename):
-        first_matching_include = num
-        last_matching_include = num
-        continue
+      # Find the part where the includes begin.
+      if not includes_start_at:
+        includes_start_at = num
 
-      if regex.search(potentially_included_filename):
-        last_matching_include = num
+      # Keep the lines that don't match the RegEx, these are includes that are
+      # not to be sorted.
+      if not regex.search(potentially_included_filename):
+        lines_to_keep.append(l)
 
-    if not first_matching_include or not last_matching_include:
+    if not includes_start_at:
       print("Error! No inclusion directives found in module file."
             % module_file,
             file=sys.stderr)
       return False
 
-    # Rewrite this part to contain the topological order of files.
+    # Rewrite matching lines to the topological order of files.
     new_includes = []
     for file in topological:
       # Modules usually include files relative to the module file's own
@@ -651,9 +648,9 @@ def write_topological_order(module_file,
       file = file.replace(os.path.dirname(module_file), '').lstrip('/')
       new_includes.append(include.filename_to_directive(file) + '\n')
 
-    lines = lines[:first_matching_include] + \
+    lines = lines[:includes_start_at] + \
             new_includes + \
-            lines[last_matching_include + 1:]
+            lines_to_keep
 
     f.seek(0)
     f.writelines(lines)
