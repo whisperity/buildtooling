@@ -6,6 +6,8 @@
 #include "ImplementsEdges.h"
 #include "Replacement.h"
 
+#include <iostream>
+
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace SymbolRewriter;
@@ -289,6 +291,91 @@ private:
     ImplementsEdges& Implementses;
 };
 
+/**
+ * A match callback that handles filling the map with symbol table entries that
+ * create subtle "uses" dependencies between headers and TUs.
+ *
+ * One such example is the forward declaration of classes, which must be kept
+ * within the boundary of an emitted module.
+ */
+class HandleSymbolTableRelation
+    : public MatchFinder::MatchCallback
+{
+public:
+    HandleSymbolTableRelation(FileReplaceDirectives&,
+                              ImplementsEdges&)
+    {}
+
+    void run(const MatchFinder::MatchResult& Result) override
+    {
+        if (const auto* FwdND = Result.Nodes.getNodeAs<NamedDecl>("forward"))
+            return HandleForwardDeclaration(FwdND);
+        else if (const auto* DefND = Result.Nodes.getNodeAs<NamedDecl>(
+            "define"))
+            return HandleDefinition(DefND);
+
+        assert(std::string("Matched something with an unhandled category.").
+            empty());
+    }
+
+private:
+
+    void HandleForwardDeclaration(const NamedDecl* ND)
+    {
+        std::cout << "FWD DECL: ";
+
+        const SourceManager& SM = ND->getASTContext().getSourceManager();
+        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
+        std::string Filename = SM.getFilename(SLoc);
+        if (SLoc.isInvalid())
+        {
+            std::cerr << "INVALID LOCATION." << std::endl;
+            ND->dump();
+            return;
+        }
+        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+            // System headers should stay where they are...
+            return;
+
+        unsigned int Line = SM.getSpellingLineNumber(SLoc);
+        unsigned int Column = SM.getSpellingColumnNumber(SLoc);
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+        {
+            // Identifiers without a name cannot be forward declared in writing.
+            using llvm::Twine;
+            std::string DeclName = (Twine("unnameable_decl_at__") +
+                                    Twine(Line) + "_" + Twine(Column)).str();
+            std::cerr << "Unnameble decl fwd declared: " << DeclName
+                      << std::endl;
+            ND->dump();
+            return;
+        }
+
+        std::cout << "Forward declaration of " << ND->getDeclKindName() << " "
+                  << ND->getName().str() << " at " << Filename << ":" << Line <<
+                  ":" << Column << "." << std::endl;
+    }
+
+    void HandleDefinition(const NamedDecl* ND)
+    {
+        const SourceManager& SM = ND->getASTContext().getSourceManager();
+        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
+        std::string Filename = SM.getFilename(SLoc);
+        if (SLoc.isInvalid())
+            return;
+        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+            // System headers should stay where they are...
+            return;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // Identifiers without a name cannot be forward declared in writing.
+            return;
+
+        std::cout << "Definition of " << ND->getDeclKindName() << " " <<
+            ND->getName().str() << " in " << Filename << std::endl;
+    }
+
+};
+
 } // namespace (anonymous)
 
 namespace SymbolRewriter
@@ -345,6 +432,32 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
         };
         for (auto Matcher : ImplementingDecls)
             AddIDBoundMatcher<HandleFindingImplementsRelation>(Matcher);
+    }
+
+    // Adds matchers that help spanning the more subtle dependency relations
+    // between TUs.
+    {
+        // Forward declarations must be respected across module boundaries,
+        // because a forward declaration in module A cannot be used in a
+        // module B, as it will result in a conflict.
+        auto ForwardDecls = {
+            functionDecl(InSomeGlobalishScope, unless(isDefinition())),
+            varDecl(InSomeGlobalishScope, unless(isDefinition())),
+            cxxRecordDecl(InSomeGlobalishScope, unless(hasDefinition()))
+        };
+        for (auto Matcher : ForwardDecls)
+            AddIDBoundMatcher<HandleSymbolTableRelation>("forward", Matcher);
+    }
+    {
+        // Also fill the "symbol table" with the actual definitions of these
+        // symbols.
+        auto DefiningDecls = {
+            functionDecl(InSomeGlobalishScope, isDefinition()),
+            varDecl(InSomeGlobalishScope, isDefinition()),
+            cxxRecordDecl(InSomeGlobalishScope, hasDefinition())
+        };
+        for (auto Matcher : DefiningDecls)
+            AddIDBoundMatcher<HandleSymbolTableRelation>("define", Matcher);
     }
 }
 

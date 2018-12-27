@@ -51,7 +51,14 @@ if not success:
 
 # ------------------------- Real execution begins now -------------------------
 
-# PassLoader.execute_pass('execute_symbol_rewriter')
+# TODO: Forward declarations should be mapped to their definitions and this
+# TODO: shall constitute a "uses" relation. This is because a forward decl in
+# TODO: module A and a full definition in module B when used together creates
+# TODO: an error message.
+# QUESTION: At this point we'd be better off just doing a CodeCompass parse
+# QUESTION: and wrangling the database...
+
+PassLoader.execute_pass('execute_symbol_rewriter')
 
 # Load the necessary knowledge about the project.
 MODULE_MAP, DEPENDENCY_MAP = \
