@@ -10,6 +10,7 @@
 
 #include "ImplementsEdges.h"
 #include "Replacement.h"
+#include "SymbolTableDump.h"
 #include "TheFinder.h"
 
 using namespace clang::tooling;
@@ -64,7 +65,10 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         Filepath, stem(Filepath));
     auto Implementses = std::make_unique<ImplementsEdges>(Filepath);
-    MatcherFactory Factory{*Replacements, *Implementses};
+    auto SymbolTableDumper = std::make_unique<SymbolTableDump>();
+    MatcherFactory Factory{*Replacements,
+                           *Implementses,
+                           *SymbolTableDumper};
 
     std::cout << "Running for '" << Filepath << "'..." << std::endl;
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
@@ -109,7 +113,10 @@ ToolResult ExecuteTool(const FileMap& FileMap,
     auto Replacements = std::make_unique<FileReplaceDirectives>(
         SourceName, stem(SourceName));
     auto Implementses = std::make_unique<ImplementsEdges>(SourceName);
-    MatcherFactory Factory{*Replacements, *Implementses};
+    auto SymbolTableDumper = std::make_unique<SymbolTableDump>();
+    MatcherFactory Factory{*Replacements,
+                           *Implementses,
+                           *SymbolTableDumper};
 
     std::cout << "Running for '" << SourceName << "'..." << std::endl;
     int Result = Tool.run(newFrontendActionFactory(&Factory()).get());
