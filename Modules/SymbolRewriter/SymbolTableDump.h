@@ -66,4 +66,4 @@ void writeSymbolForwardDeclarationsOutput(std::ostream& Output,
 
 } // namespace SymbolRewriter
 
-#endif //SYMBOLREWRITER_SYMBOLTABLEDUMP_H
+#endif // SYMBOLREWRITER_SYMBOLTABLEDUMP_H

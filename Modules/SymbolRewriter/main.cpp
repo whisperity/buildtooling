@@ -8,7 +8,9 @@
 
 #include "Executor.h"
 #include "ImplementsEdges.h"
+#include "LockedFile.h"
 #include "Replacement.h"
+#include "SymbolTableDump.h"
 #include "threadpool.h"
 
 using namespace clang;
@@ -65,9 +67,11 @@ int main(int argc, const char** argv)
         }
     }
 
+    SynchronisedFiles ThreadsafeFileAccess;
+
     std::cout << "Using " << ThreadCount << " threads..." << std::endl;
     auto Threading = make_thread_pool<ToolExecution>(ThreadCount,
-        [](auto& Execution)
+        [&ThreadsafeFileAccess](auto& Execution)
         {
             ToolResult ToolResult = Execution();
             if (auto* RetCode = std::get_if<int>(&ToolResult))
@@ -81,35 +85,74 @@ int main(int argc, const char** argv)
 
             // Write the results.
             {
-                std::string OutputFile =
-                    Execution.filepathWithoutExtension()
-                    .append(Execution.extension())
-                    .append("-symbols.txt");
+                std::string OutputFile = std::string(Execution.filepath())
+                    .append("-badsymbols.txt");
                 std::ofstream OutputBuffer{OutputFile};
                 if (OutputBuffer.fail())
-                    std::cerr << "Can't write output for '"
+                    std::cerr << "Can't write BAD SYMBOLS output for '"
                               << Execution.filepath()
                               << "' to file '" << OutputFile
                               << "' because the file never opened."
                               << std::endl;
                 else
-                    writeReplacementOutput(OutputBuffer, *Results.first);
+                    writeReplacementOutput(OutputBuffer,
+                                           *std::get<0>(Results));
+            }
+            {
+                std::string OutputFile = std::string(Execution.filepath())
+                    .append("-implements.txt");
+                std::ofstream OutputBuffer{OutputFile};
+                if (OutputBuffer.fail())
+                    std::cerr << "Can't write IMPLEMENTS output for '"
+                              << Execution.filepath()
+                              << "' to file '" << OutputFile
+                              << "' because the file never opened."
+                              << std::endl;
+                else
+                    writeImplementsOutput(OutputBuffer,
+                                          *std::get<1>(Results));
             }
 
+            // The symbol table outputs may collide between files and should be
+            // accessed threadsafe.
+            const SymbolTableDump* STD = std::get<2>(Results).get();
+            for (const std::string& Filename : STD->getKnownFiles())
             {
-                std::string OutputFile =
-                    Execution.filepathWithoutExtension()
-                        .append(Execution.extension())
-                        .append("-implements.txt");
-                std::ofstream OutputBuffer{OutputFile};
-                if (OutputBuffer.fail())
-                    std::cerr << "Can't write output for '"
-                              << Execution.filepath()
-                              << "' to file '" << OutputFile
-                              << "' because the file never opened."
-                              << std::endl;
-                else
-                    writeImplementsOutput(OutputBuffer, *Results.second);
+                {
+                    std::string OutputFile = std::string(Filename)
+                        .append("-definitions.txt");
+                    SynchronisedFiles::SynchronisedFile File =
+                        ThreadsafeFileAccess.open(OutputFile);
+                    std::ostream& OutputBuffer = File();
+                    if (OutputBuffer.fail())
+                        std::cerr << "Can't write DEFINITION output for '"
+                                  << Execution.filepath()
+                                  << "' to file '" << OutputFile
+                                  << "' because the file never opened."
+                                  << std::endl;
+                    else
+                        writeSymbolDefinitionsOutput(OutputBuffer,
+                                                     Filename,
+                                                     *std::get<2>(Results));
+                }
+
+                {
+                    std::string OutputFile = std::string(Filename)
+                        .append("-forwarddeclarations.txt");
+                    SynchronisedFiles::SynchronisedFile File =
+                        ThreadsafeFileAccess.open(OutputFile);
+                    std::ostream& OutputBuffer = File();
+                    if (OutputBuffer.fail())
+                        std::cerr << "Can't write FORWARD DECLARATION output "
+                                     "for '"
+                                  << Execution.filepath()
+                                  << "' to file '" << OutputFile
+                                  << "' because the file never opened."
+                                  << std::endl;
+                    else
+                        writeSymbolForwardDeclarationsOutput(
+                            OutputBuffer, Filename, *std::get<2>(Results));
+                }
             }
         });
 

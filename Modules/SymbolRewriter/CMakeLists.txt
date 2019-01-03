@@ -50,6 +50,7 @@ add_library(RewritingTool STATIC
     TheFinder.cpp)
 
 add_executable(SymbolRewriter
+    LockedFile.cpp
     main.cpp)
 target_link_libraries(SymbolRewriter
     RewritingTool

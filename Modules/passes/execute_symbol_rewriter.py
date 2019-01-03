@@ -30,7 +30,7 @@ def main(SYMBOL_REWRITER_BINARY, COMPILE_COMMAND_JSON, START_FOLDER):
   # parsed and used by later steps. However, for certain translation units,
   # these files might be empty, so it would be an extra step to read these.
   for emitted_file in filter(
-        lambda s: s.endswith(('-symbols.txt',
+        lambda s: s.endswith(('-badsymbols.txt',
                               '-implements.txt')),
         utils.walk_folder(START_FOLDER)):
     with open(emitted_file, 'r') as handle:

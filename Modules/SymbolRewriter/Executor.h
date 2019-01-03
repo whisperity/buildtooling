@@ -23,12 +23,14 @@ namespace SymbolRewriter
 
 class FileReplaceDirectives;
 class ImplementsEdges;
+class SymbolTableDump;
 
 typedef std::map<std::string, std::string> FileMap;
 
-typedef std::pair<
+typedef std::tuple<
     std::unique_ptr<FileReplaceDirectives>,
-    std::unique_ptr<ImplementsEdges>> UsefulResultType;
+    std::unique_ptr<ImplementsEdges>,
+    std::unique_ptr<SymbolTableDump>> UsefulResultType;
 
 typedef std::variant<int, UsefulResultType> ToolResult;
 

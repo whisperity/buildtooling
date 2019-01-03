@@ -7,8 +7,6 @@
 #include "Replacement.h"
 #include "SymbolTableDump.h"
 
-#include <iostream>
-
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace SymbolRewriter;
@@ -93,9 +91,6 @@ public:
         const SourceLocation& Loc = Result.SourceManager->getSpellingLoc(
             ND->getLocation());
         std::string Filename = Result.SourceManager->getFilename(Loc);
-        size_t Line = Result.SourceManager->getSpellingLineNumber(Loc);
-        size_t Column = Result.SourceManager->getSpellingColumnNumber(Loc);
-
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
         if (Loc.isInvalid())
             return;
@@ -103,8 +98,8 @@ public:
             return;
 
         Replacements.AddReplacementPosition(
-            Line,
-            Column,
+            Result.SourceManager->getSpellingLineNumber(Loc),
+            Result.SourceManager->getSpellingColumnNumber(Loc),
             DeclName,
             ND);
     }
@@ -205,20 +200,17 @@ private:
     {
         const SourceLocation& Loc = SM.getSpellingLoc(DRE->getLocation());
         std::string Filename = SM.getFilename(Loc);
-        size_t Line = SM.getSpellingLineNumber(Loc);
-        size_t Column = SM.getSpellingColumnNumber(Loc);
         if (Loc.isInvalid())
             return;
         if (Replacements.getFilepath() != Filename)
             return;
-
         if (!DRE->getDecl()->getDeclName().isIdentifier())
             // Identifiers without a name cannot be renamed.
             return;
 
         Replacements.AddReplacementPosition(
-            Line,
-            Column,
+            SM.getSpellingLineNumber(Loc),
+            SM.getSpellingColumnNumber(Loc),
             DRE->getDecl()->getName().str(),
             DRE->getDecl());
     }
@@ -344,32 +336,6 @@ public:
 
 private:
 
-    void HandleForwardDeclaration(const NamedDecl* ND)
-    {
-        const SourceManager& SM = ND->getASTContext().getSourceManager();
-        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
-        std::string Filename = SM.getFilename(SLoc);
-        if (SLoc.isInvalid())
-            return;
-        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
-            // System headers should stay where they are...
-            return;
-
-        unsigned int Line = SM.getSpellingLineNumber(SLoc);
-        unsigned int Column = SM.getSpellingColumnNumber(SLoc);
-        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
-            // Identifiers without a name cannot be forward declared in writing.
-            return;
-
-        std::cout << "Forward declaration of " << ND->getDeclKindName() << " "
-                  << ND->getQualifiedNameAsString() << " at " << Filename << ":"
-                  << Line <<
-                  ":" << Column << "." << std::endl;
-
-        SymbolTableDumper.AddForwardDeclaration(Filename, Line, Column,
-                                                ND->getQualifiedNameAsString());
-    }
-
     void HandleDefinition(const NamedDecl* ND)
     {
         if (isa<FieldDecl>(ND) || isa<CXXMethodDecl>(ND))
@@ -391,14 +357,32 @@ private:
             // Identifiers without a name cannot be forward declared in writing.
             return;
 
-        unsigned int Line = SM.getSpellingLineNumber(SLoc);
-        unsigned int Column = SM.getSpellingColumnNumber(SLoc);
+        SymbolTableDumper.AddDefinition(
+            Filename,
+            SM.getSpellingLineNumber(SLoc),
+            SM.getSpellingColumnNumber(SLoc),
+            ND->getQualifiedNameAsString());
+    }
 
-        std::cout << "Definition of " << ND->getDeclKindName() << " " <<
-                  ND->getQualifiedNameAsString() << " in " << Filename << ":"
-                  << Line << ":" << Column << std::endl;
-        SymbolTableDumper.AddDefinition(Filename, Line, Column,
-                                        ND->getQualifiedNameAsString());
+    void HandleForwardDeclaration(const NamedDecl* ND)
+    {
+        const SourceManager& SM = ND->getASTContext().getSourceManager();
+        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
+        std::string Filename = SM.getFilename(SLoc);
+        if (SLoc.isInvalid())
+            return;
+        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+            // System headers should stay where they are...
+            return;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // Identifiers without a name cannot be forward declared in writing.
+            return;
+
+        SymbolTableDumper.AddForwardDeclaration(
+            Filename,
+            SM.getSpellingLineNumber(SLoc),
+            SM.getSpellingColumnNumber(SLoc),
+            ND->getQualifiedNameAsString());
     }
 
     SymbolTableDump& SymbolTableDumper;

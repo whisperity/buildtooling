@@ -78,7 +78,9 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
                   << " for " << Filepath << std::endl;
         return Result;
     }
-    return std::make_pair(std::move(Replacements), std::move(Implementses));
+    return std::make_tuple(std::move(Replacements),
+                           std::move(Implementses),
+                           std::move(SymbolTableDumper));
 }
 
 ToolResult ExecuteTool(const FileMap& FileMap,
@@ -126,7 +128,9 @@ ToolResult ExecuteTool(const FileMap& FileMap,
                   << " for " << SourceName << std::endl;
         return Result;
     }
-    return std::make_pair(std::move(Replacements), std::move(Implementses));
+    return std::make_tuple(std::move(Replacements),
+                           std::move(Implementses),
+                           std::move(SymbolTableDumper));
 }
 
 } // namespace SymbolRewriter
