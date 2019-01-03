@@ -70,7 +70,7 @@ int main(int argc, const char** argv)
         [](auto& Execution)
         {
             ToolResult ToolResult = Execution();
-            if (int* RetCode = std::get_if<int>(&ToolResult))
+            if (auto* RetCode = std::get_if<int>(&ToolResult))
             {
                 std::cerr << "Error! Non-zero return code from Clang on file "
                           << Execution.filename() << ": " << *RetCode
@@ -79,6 +79,7 @@ int main(int argc, const char** argv)
             }
             auto Results = std::get<UsefulResultType>(std::move(ToolResult));
 
+            // Write the results.
             {
                 std::string OutputFile =
                     Execution.filepathWithoutExtension()

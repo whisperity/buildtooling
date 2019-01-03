@@ -37,7 +37,12 @@ SymbolTableDump::AddForwardDeclaration(std::string Filepath,
 const std::set<std::string>
 SymbolTableDump::getKnownFiles() const
 {
-    return std::set<std::string>();
+    std::set<std::string> Ret;
+    for (const auto& Entry : CollectedDefinitions)
+        Ret.emplace(Entry.first);
+    for (const auto& Entry : CollectedForwardDeclarations)
+        Ret.emplace(Entry.first);
+    return Ret;
 }
 
 const SymbolTableDump::SymbolVector&

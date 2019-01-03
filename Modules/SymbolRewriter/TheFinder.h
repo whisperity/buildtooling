@@ -33,7 +33,7 @@ public:
 private:
     FileReplaceDirectives& Replacements;
     ImplementsEdges& Implementses;
-    SymbolTableDump& SymbolTableDump;
+    SymbolTableDump& SymbolTableDumper;
 
     clang::ast_matchers::MatchFinder TheFinder;
     std::vector<clang::ast_matchers::MatchFinder::MatchCallback*> Callbacks;

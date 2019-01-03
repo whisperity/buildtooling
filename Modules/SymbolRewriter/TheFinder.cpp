@@ -320,7 +320,23 @@ public:
             return HandleForwardDeclaration(FwdND);
         else if (const auto* DefND = Result.Nodes.getNodeAs<NamedDecl>(
             "define"))
+        {
+            if (const auto* RD = dyn_cast<CXXRecordDecl>(DefND))
+            {
+                if (RD->getDefinition() == RD)
+                    return HandleDefinition(RD);
+                else
+                    // Sometimes a class can be "forward declared" in a file
+                    // later (with regards to the full TU tokenstream) than it
+                    // was defined, in which case it would be picked up as a
+                    // fully defined (hasDefinition() is true) node.
+                    return HandleForwardDeclaration(RD);
+            }
+
+            if (!DefND->hasBody())
+                return HandleForwardDeclaration(DefND);
             return HandleDefinition(DefND);
+        }
 
         assert(std::string("Matched something with an unhandled category.").
             empty());
@@ -330,17 +346,11 @@ private:
 
     void HandleForwardDeclaration(const NamedDecl* ND)
     {
-        std::cout << "FWD DECL: ";
-
         const SourceManager& SM = ND->getASTContext().getSourceManager();
         const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
         std::string Filename = SM.getFilename(SLoc);
         if (SLoc.isInvalid())
-        {
-            std::cerr << "INVALID LOCATION." << std::endl;
-            ND->dump();
             return;
-        }
         if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
             // System headers should stay where they are...
             return;
@@ -348,16 +358,8 @@ private:
         unsigned int Line = SM.getSpellingLineNumber(SLoc);
         unsigned int Column = SM.getSpellingColumnNumber(SLoc);
         if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
-        {
             // Identifiers without a name cannot be forward declared in writing.
-            using llvm::Twine;
-            std::string DeclName = (Twine("unnameable_decl_at__") +
-                                    Twine(Line) + "_" + Twine(Column)).str();
-            std::cerr << "Unnameble decl fwd declared: " << DeclName
-                      << std::endl;
-            ND->dump();
             return;
-        }
 
         std::cout << "Forward declaration of " << ND->getDeclKindName() << " "
                   << ND->getQualifiedNameAsString() << " at " << Filename << ":"
@@ -412,7 +414,7 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
                                class SymbolTableDump& SymbolTableDumper)
    : Replacements(Replacements)
    , Implementses(ImplementsEdges)
-   , SymbolTableDump(SymbolTableDumper)
+   , SymbolTableDumper(SymbolTableDumper)
 {
     // Create matchers for named declarations which are to be renamed.
     {
@@ -512,7 +514,7 @@ MatchFinder::MatchCallback* MatcherFactory::CreateCallback()
 {
     Callbacks.push_back(new Handler{this->Replacements,
                                     this->Implementses,
-                                    this->SymbolTableDump});
+                                    this->SymbolTableDumper});
     return Callbacks.back();
 }
 
