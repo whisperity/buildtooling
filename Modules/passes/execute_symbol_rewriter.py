@@ -31,7 +31,9 @@ def main(SYMBOL_REWRITER_BINARY, COMPILE_COMMAND_JSON, START_FOLDER):
   # these files might be empty, so it would be an extra step to read these.
   for emitted_file in filter(
         lambda s: s.endswith(('-badsymbols.txt',
-                              '-implements.txt')),
+                              '-implements.txt',
+                              '-forwarddeclarations.txt',
+                              '-definitions.txt')),
         utils.walk_folder(START_FOLDER)):
     with open(emitted_file, 'r') as handle:
       if os.fstat(handle.fileno()).st_size == 0:

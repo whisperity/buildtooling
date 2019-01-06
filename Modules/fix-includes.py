@@ -51,13 +51,6 @@ if not success:
 
 # ------------------------- Real execution begins now -------------------------
 
-# TODO: Forward declarations should be mapped to their definitions and this
-# TODO: shall constitute a "uses" relation. This is because a forward decl in
-# TODO: module A and a full definition in module B when used together creates
-# TODO: an error message.
-# QUESTION: At this point we'd be better off just doing a CodeCompass parse
-# QUESTION: and wrangling the database...
-
 PassLoader.execute_pass('execute_symbol_rewriter')
 
 # Load the necessary knowledge about the project.
@@ -70,6 +63,10 @@ PassLoader.register_global('DEPENDENCY_MAP', DEPENDENCY_MAP)
 PassLoader.register_global('REMOVE_LINES_FROM_FILES', dict())
 
 PassLoader.execute_pass('load_implements_relations')
+DEFINITIONS, FORWARD_DECLARATIONS = \
+  PassLoader.execute_pass('load_module_affected_symbol_table')
+PassLoader.register_global('DEFINITIONS', DEFINITIONS)
+PassLoader.register_global('FORWARD_DECLARATIONS', FORWARD_DECLARATIONS)
 
 # Fetch the dependencies from the headers only.
 PassLoader.register_global(
@@ -81,7 +78,6 @@ PassLoader.register_global('FILTER_FILE_REGEX', None)
 # Execute the passes of the algorithm and try to solve modularisation.
 PassLoader.execute_pass('solve_potential_module_import_cycles')
 PassLoader.execute_pass('move_implementation_files_to_new_modules')
-PassLoader.execute_pass('rename_conflicting_symbols')
 
 # After the types had been broken up, implementation files can still have some
 # dependent headers.
@@ -92,8 +88,10 @@ PassLoader.execute_pass('fetch_dependency_includes')
 PassLoader.register_global('FILTER_FILE_REGEX', None)
 
 PassLoader.execute_pass('join_implementation_cycles')
+PassLoader.execute_pass('clean_forward_declarations')
 
 # Save the algorithm's output.
+PassLoader.execute_pass('rename_conflicting_symbols')
 PassLoader.execute_pass('remove_lines_from_source')
 PassLoader.execute_pass('write_module_files')
 PassLoader.execute_pass('emit_cmake_module_directives')

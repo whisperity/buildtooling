@@ -8,7 +8,7 @@ PASS_NAME = "Remove unnecessary lines from source files"
 
 
 def main(REMOVE_LINES_FROM_FILES):
-  for file, remove_list in tqdm(REMOVE_LINES_FROM_FILES.items(),
+  for file, remove_list in tqdm(sorted(REMOVE_LINES_FROM_FILES.items()),
                                 desc="Removing obsolete source text",
                                 unit='file'):
     try:
