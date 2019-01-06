@@ -66,6 +66,9 @@ MODULE_MAP, DEPENDENCY_MAP = \
 PassLoader.register_global('MODULE_MAP', MODULE_MAP)
 PassLoader.register_global('DEPENDENCY_MAP', DEPENDENCY_MAP)
 
+# Register a collection of lines that need to be cleaned later on.
+PassLoader.register_global('REMOVE_LINES_FROM_FILES', dict())
+
 PassLoader.execute_pass('load_implements_relations')
 
 # Fetch the dependencies from the headers only.
@@ -91,5 +94,6 @@ PassLoader.register_global('FILTER_FILE_REGEX', None)
 PassLoader.execute_pass('join_implementation_cycles')
 
 # Save the algorithm's output.
+PassLoader.execute_pass('remove_lines_from_source')
 PassLoader.execute_pass('write_module_files')
 PassLoader.execute_pass('emit_cmake_module_directives')
