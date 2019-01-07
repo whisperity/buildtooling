@@ -88,7 +88,7 @@ PassLoader.execute_pass('fetch_dependency_includes')
 PassLoader.register_global('FILTER_FILE_REGEX', None)
 
 PassLoader.execute_pass('join_implementation_cycles')
-PassLoader.execute_pass('clean_forward_declarations')
+PassLoader.execute_pass('move_forward_declarations_to_defining_module')
 
 # Save the algorithm's output.
 PassLoader.execute_pass('rename_conflicting_symbols')
