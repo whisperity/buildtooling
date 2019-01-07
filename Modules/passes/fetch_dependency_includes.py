@@ -7,12 +7,15 @@ from utils.progress_bar import tqdm
 PASS_NAME = "Fetch dependency \"#include\"s from files"
 
 
-def main(MODULE_MAP, DEPENDENCY_MAP, FILTER_FILE_REGEX):
+def main(MODULE_MAP,
+         DEPENDENCY_MAP,
+         FILTER_FILE_REGEX,
+         REMOVE_LINES_FROM_FILES):
   # Handle removing #include directives from files matching the given RegEx and
   # adding them as module imports instead.
-  headers = list(filter(FILTER_FILE_REGEX.search,
-                        MODULE_MAP.get_all_fragments()))
-  for file in tqdm(headers,
+  files = list(filter(FILTER_FILE_REGEX.search,
+                      MODULE_MAP.get_all_fragments()))
+  for file in tqdm(files,
                    desc="Collecting includes",
                    unit='file',
                    position=1):
@@ -24,18 +27,13 @@ def main(MODULE_MAP, DEPENDENCY_MAP, FILTER_FILE_REGEX):
                  file=sys.stderr)
       continue
 
-    new_text = include.filter_imports_from_includes(
+    lines_to_remove_from_file = include.filter_imports_from_includes(
       file, content, MODULE_MAP, DEPENDENCY_MAP)
 
-    if not new_text:
-      # If no includes had been removed from the file, there is no change to do
-      # and thus new_text is None.
+    if not lines_to_remove_from_file:
       continue
 
-    try:
-      with codecs.open(file, 'w', encoding='utf-8', errors='replace') as f:
-        f.write(new_text)
-    except OSError as e:
-      tqdm.write("Couldn't write file '%s': %s" % (file, e),
-                 file=sys.stderr)
-      continue
+    stored_remove_list = REMOVE_LINES_FROM_FILES.get(file, list())
+    if not stored_remove_list:
+      REMOVE_LINES_FROM_FILES[file] = stored_remove_list
+    stored_remove_list += lines_to_remove_from_file

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <memory>
 
+#include "SymbolTableDump.h"
+
 std::vector<std::string> TrivialCompileCommand = {
     "/usr/bin/c++",
     "-std=c++14",
@@ -20,7 +22,8 @@ std::unique_ptr<FileReplaceDirectives> getReplacementsForCompilation(
     ToolResult Result = ExecuteTool(FileMap, Filename, CompileCommand);
     if (std::get_if<int>(&Result))
         return nullptr;
-    return std::move(std::get<UsefulResultType>(std::move(Result)).first);
+    return std::move(std::get<0>(
+        std::get<UsefulResultType>(std::move(Result))));
 }
 
 std::unique_ptr<ImplementsEdges> getImplementsRelationForCompilation(
@@ -31,7 +34,8 @@ std::unique_ptr<ImplementsEdges> getImplementsRelationForCompilation(
     ToolResult Result = ExecuteTool(FileMap, Filename, CompileCommand);
     if (std::get_if<int>(&Result))
         return nullptr;
-    return std::move(std::get<UsefulResultType>(std::move(Result)).second);
+    return std::move(std::get<1>(
+        std::get<UsefulResultType>(std::move(Result))));
 }
 
 bool positionFound(

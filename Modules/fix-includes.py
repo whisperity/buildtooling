@@ -51,7 +51,7 @@ if not success:
 
 # ------------------------- Real execution begins now -------------------------
 
-# PassLoader.execute_pass('execute_symbol_rewriter')
+PassLoader.execute_pass('execute_symbol_rewriter')
 
 # Load the necessary knowledge about the project.
 MODULE_MAP, DEPENDENCY_MAP = \
@@ -59,7 +59,14 @@ MODULE_MAP, DEPENDENCY_MAP = \
 PassLoader.register_global('MODULE_MAP', MODULE_MAP)
 PassLoader.register_global('DEPENDENCY_MAP', DEPENDENCY_MAP)
 
+# Register a collection of lines that need to be cleaned later on.
+PassLoader.register_global('REMOVE_LINES_FROM_FILES', dict())
+
 PassLoader.execute_pass('load_implements_relations')
+DEFINITIONS, FORWARD_DECLARATIONS = \
+  PassLoader.execute_pass('load_module_affected_symbol_table')
+PassLoader.register_global('DEFINITIONS', DEFINITIONS)
+PassLoader.register_global('FORWARD_DECLARATIONS', FORWARD_DECLARATIONS)
 
 # Fetch the dependencies from the headers only.
 PassLoader.register_global(
@@ -71,7 +78,6 @@ PassLoader.register_global('FILTER_FILE_REGEX', None)
 # Execute the passes of the algorithm and try to solve modularisation.
 PassLoader.execute_pass('solve_potential_module_import_cycles')
 PassLoader.execute_pass('move_implementation_files_to_new_modules')
-PassLoader.execute_pass('rename_conflicting_symbols')
 
 # After the types had been broken up, implementation files can still have some
 # dependent headers.
@@ -82,7 +88,10 @@ PassLoader.execute_pass('fetch_dependency_includes')
 PassLoader.register_global('FILTER_FILE_REGEX', None)
 
 PassLoader.execute_pass('join_implementation_cycles')
+PassLoader.execute_pass('move_forward_declarations_to_defining_module')
 
 # Save the algorithm's output.
+PassLoader.execute_pass('rename_conflicting_symbols')
+PassLoader.execute_pass('remove_lines_from_source')
 PassLoader.execute_pass('write_module_files')
 PassLoader.execute_pass('emit_cmake_module_directives')

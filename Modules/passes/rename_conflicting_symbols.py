@@ -12,7 +12,7 @@ def main(START_FOLDER):
   # file at what position a rename must be made so concatenated implementation
   # files will work without name collisions that previously were not a problem
   # when implementation files were different TUs.
-  symbol_rename_files = list(filter(lambda s: s.endswith("-symbols.txt"),
+  symbol_rename_files = list(filter(lambda s: s.endswith("-badsymbols.txt"),
                                     utils.walk_folder(START_FOLDER)))
   for directive_file in tqdm(symbol_rename_files,
                              desc="Renaming problematic symbols",

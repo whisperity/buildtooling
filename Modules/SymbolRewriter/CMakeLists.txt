@@ -38,6 +38,7 @@ list(APPEND LLVM_LIBRARIES_USED
     clangASTMatchers
     clangBasic
     clangFrontend
+    clangSerialization
     clangTooling
     LLVMSupport)
 
@@ -45,9 +46,11 @@ add_library(RewritingTool STATIC
     Executor.cpp
     ImplementsEdges.cpp
     Replacement.cpp
+    SymbolTableDump.cpp
     TheFinder.cpp)
 
 add_executable(SymbolRewriter
+    LockedFile.cpp
     main.cpp)
 target_link_libraries(SymbolRewriter
     RewritingTool

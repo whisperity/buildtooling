@@ -5,6 +5,7 @@
 
 #include "ImplementsEdges.h"
 #include "Replacement.h"
+#include "SymbolTableDump.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -50,7 +51,9 @@ auto InSomeGlobalishScope = anyOf(
 /**
  * Renaming such TU-Internal declarations is enough to break ambiguity.
  */
-auto TUInternalTraits = allOf(LocalInTheTU, InSomeGlobalishScope);
+auto TUInternalTraits = allOf(
+    LocalInTheTU,
+    InSomeGlobalishScope);
 
 /**
  * To seek out which headers are implemented in the current TU, we need only the
@@ -70,7 +73,8 @@ class HandleDeclarations
 
 public:
     HandleDeclarations(FileReplaceDirectives& Replacements,
-                       ImplementsEdges&)
+                       ImplementsEdges&,
+                       SymbolTableDump&)
         : Replacements(Replacements)
     {}
 
@@ -87,9 +91,6 @@ public:
         const SourceLocation& Loc = Result.SourceManager->getSpellingLoc(
             ND->getLocation());
         std::string Filename = Result.SourceManager->getFilename(Loc);
-        size_t Line = Result.SourceManager->getSpellingLineNumber(Loc);
-        size_t Column = Result.SourceManager->getSpellingColumnNumber(Loc);
-
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
         if (Loc.isInvalid())
             return;
@@ -97,8 +98,8 @@ public:
             return;
 
         Replacements.AddReplacementPosition(
-            Line,
-            Column,
+            Result.SourceManager->getSpellingLineNumber(Loc),
+            Result.SourceManager->getSpellingColumnNumber(Loc),
             DeclName,
             ND);
     }
@@ -116,7 +117,8 @@ class HandleUsagePoints
 
 public:
     HandleUsagePoints(FileReplaceDirectives& Replacements,
-                      ImplementsEdges&)
+                      ImplementsEdges&,
+                      SymbolTableDump&)
         : Replacements(Replacements)
     {}
 
@@ -198,20 +200,17 @@ private:
     {
         const SourceLocation& Loc = SM.getSpellingLoc(DRE->getLocation());
         std::string Filename = SM.getFilename(Loc);
-        size_t Line = SM.getSpellingLineNumber(Loc);
-        size_t Column = SM.getSpellingColumnNumber(Loc);
         if (Loc.isInvalid())
             return;
         if (Replacements.getFilepath() != Filename)
             return;
-
         if (!DRE->getDecl()->getDeclName().isIdentifier())
             // Identifiers without a name cannot be renamed.
             return;
 
         Replacements.AddReplacementPosition(
-            Line,
-            Column,
+            SM.getSpellingLineNumber(Loc),
+            SM.getSpellingColumnNumber(Loc),
             DRE->getDecl()->getName().str(),
             DRE->getDecl());
     }
@@ -228,7 +227,8 @@ class HandleFindingImplementsRelation
 {
 public:
     HandleFindingImplementsRelation(FileReplaceDirectives&,
-                                    ImplementsEdges& Implementses)
+                                    ImplementsEdges& Implementses,
+                                    SymbolTableDump&)
         : Implementses(Implementses)
     {}
 
@@ -289,15 +289,116 @@ private:
     ImplementsEdges& Implementses;
 };
 
+/**
+ * A match callback that handles filling the map with symbol table entries that
+ * create subtle "uses" dependencies between headers and TUs.
+ *
+ * One such example is the forward declaration of classes, which must be kept
+ * within the boundary of an emitted module.
+ */
+class HandleSymbolTableRelation
+    : public MatchFinder::MatchCallback
+{
+public:
+    HandleSymbolTableRelation(FileReplaceDirectives&,
+                              ImplementsEdges&,
+                              SymbolTableDump& SymbolTableDump)
+      : SymbolTableDumper(SymbolTableDump)
+    {}
+
+    void run(const MatchFinder::MatchResult& Result) override
+    {
+        if (const auto* FwdND = Result.Nodes.getNodeAs<NamedDecl>("forward"))
+            return HandleForwardDeclaration(FwdND);
+        else if (const auto* DefND = Result.Nodes.getNodeAs<NamedDecl>(
+            "define"))
+        {
+            if (const auto* RD = dyn_cast<CXXRecordDecl>(DefND))
+            {
+                if (RD->getDefinition() == RD)
+                    return HandleDefinition(RD);
+                else
+                    // Sometimes a class can be "forward declared" in a file
+                    // later (with regards to the full TU tokenstream) than it
+                    // was defined, in which case it would be picked up as a
+                    // fully defined (hasDefinition() is true) node.
+                    return HandleForwardDeclaration(RD);
+            }
+
+            if (!DefND->hasBody())
+                return HandleForwardDeclaration(DefND);
+            return HandleDefinition(DefND);
+        }
+
+        assert(std::string("Matched something with an unhandled category.").
+            empty());
+    }
+
+private:
+
+    void HandleDefinition(const NamedDecl* ND)
+    {
+        if (isa<FieldDecl>(ND) || isa<CXXMethodDecl>(ND))
+            // Definitions for record members might exist outside the record's
+            // subtree e.g. out-of-line method implementations. However, these
+            // symbols cannot be forward-declared out-of-line, hence they can be
+            // omitted from this handler.
+            return;
+
+        const SourceManager& SM = ND->getASTContext().getSourceManager();
+        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
+        std::string Filename = SM.getFilename(SLoc);
+        if (SLoc.isInvalid())
+            return;
+        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+            // System headers should stay where they are...
+            return;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // Identifiers without a name cannot be forward declared in writing.
+            return;
+
+        SymbolTableDumper.AddDefinition(
+            Filename,
+            SM.getSpellingLineNumber(SLoc),
+            SM.getSpellingColumnNumber(SLoc),
+            ND->getQualifiedNameAsString());
+    }
+
+    void HandleForwardDeclaration(const NamedDecl* ND)
+    {
+        const SourceManager& SM = ND->getASTContext().getSourceManager();
+        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
+        std::string Filename = SM.getFilename(SLoc);
+        if (SLoc.isInvalid())
+            return;
+        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+            // System headers should stay where they are...
+            return;
+        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+            // Identifiers without a name cannot be forward declared in writing.
+            return;
+
+        SymbolTableDumper.AddForwardDeclaration(
+            Filename,
+            SM.getSpellingLineNumber(SLoc),
+            SM.getSpellingColumnNumber(SLoc),
+            ND->getQualifiedNameAsString());
+    }
+
+    SymbolTableDump& SymbolTableDumper;
+};
+
 } // namespace (anonymous)
 
 namespace SymbolRewriter
 {
 
 MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
-                               ImplementsEdges& ImplementsEdges)
+                               ImplementsEdges& ImplementsEdges,
+                               class SymbolTableDump& SymbolTableDumper)
    : Replacements(Replacements)
    , Implementses(ImplementsEdges)
+   , SymbolTableDumper(SymbolTableDumper)
 {
     // Create matchers for named declarations which are to be renamed.
     {
@@ -346,6 +447,40 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
         for (auto Matcher : ImplementingDecls)
             AddIDBoundMatcher<HandleFindingImplementsRelation>(Matcher);
     }
+
+    // Adds matchers that help spanning the more subtle dependency relations
+    // between TUs.
+    {
+        // Forward declarations must be respected across module boundaries,
+        // because a forward declaration in module A cannot be used in a
+        // module B, as it will result in a conflict.
+        auto ForwardDecls = {
+            functionDecl(InSomeGlobalishScope,
+                         unless(isDefinition())),
+            varDecl(InSomeGlobalishScope,
+                    unless(isDefinition())),
+            cxxRecordDecl(InSomeGlobalishScope,
+                          unless(hasDefinition()))
+        };
+        for (auto Matcher : ForwardDecls)
+            AddIDBoundMatcher<HandleSymbolTableRelation>("forward", Matcher);
+
+        // Also fill the "symbol table" with the actual definitions of these
+        // symbols.
+        auto DefiningDecls = {
+            functionDecl(InSomeGlobalishScope,
+                         hasExternalFormalLinkage(),
+                         isDefinition()),
+            varDecl(InSomeGlobalishScope,
+                    hasExternalFormalLinkage(),
+                    isDefinition()),
+            cxxRecordDecl(InSomeGlobalishScope,
+                          hasExternalFormalLinkage(),
+                          hasDefinition())
+        };
+        for (auto Matcher : DefiningDecls)
+            AddIDBoundMatcher<HandleSymbolTableRelation>("define", Matcher);
+    }
 }
 
 MatcherFactory::~MatcherFactory()
@@ -361,7 +496,9 @@ MatchFinder& MatcherFactory::operator()() { return TheFinder; }
 template <class Handler>
 MatchFinder::MatchCallback* MatcherFactory::CreateCallback()
 {
-    Callbacks.push_back(new Handler{this->Replacements, this->Implementses});
+    Callbacks.push_back(new Handler{this->Replacements,
+                                    this->Implementses,
+                                    this->SymbolTableDumper});
     return Callbacks.back();
 }
 

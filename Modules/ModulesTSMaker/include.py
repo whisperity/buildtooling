@@ -1,5 +1,7 @@
 import os
 import sys
+from itertools import filterfalse
+from operator import itemgetter
 
 from utils import partition
 from utils.progress_bar import tqdm
@@ -34,8 +36,7 @@ def filter_imports_from_includes(filename,
   specifies that what files belonging to a module depend on what files
   belonging to other modules.
 
-  :returns: The transformed source :param text: from which includes had been
-  removed.
+  :returns: The index and line contents of lines that should be removed.
   """
 
   # Get the "first" module from the module map read earlier which contains
@@ -48,20 +49,20 @@ def filter_imports_from_includes(filename,
 
   # Rearrange the include statements so all of them are on the top, and for
   # easier rewriting to "import", in alphabetical order.
-  original_lines = text.splitlines(True)
+  original_lines = list(enumerate(text.splitlines(True)))
   include_lines, other_lines = partition(
-    lambda line: not line.startswith("#include"), original_lines)
-  include_lines = list(sorted(include_lines))
+    lambda line: not line[1].startswith("#include"), original_lines)
+  include_lines = sorted(include_lines, key=itemgetter(1))
   if not include_lines:
     # If the file contains no "#include" statements, no need to do anything.
     return
 
   lines_to_keep = []
-  for line in tqdm(include_lines,
-                   unit='directive',
-                   desc=os.path.basename(filename),
-                   position=0,
-                   leave=False):
+  for i, line in tqdm(include_lines,
+                      unit='directive',
+                      desc=os.path.basename(filename),
+                      position=0,
+                      leave=False):
     included = directive_to_filename(line)
     if not included:
       continue
@@ -77,7 +78,7 @@ def filter_imports_from_includes(filename,
         tqdm.write("%s: Include file '%s' not found in module mapping."
                    % (filename, original_included),
                    file=sys.stderr)
-        lines_to_keep.append(line)
+        lines_to_keep.append((i, line))
         continue
 
     dependency_map.add_dependency(filename, included, 'uses')
@@ -98,6 +99,4 @@ def filter_imports_from_includes(filename,
     # Lines we don't know nothing about should be kept too.
     return True
 
-  final_lines = filter(_keep_line, original_lines)
-
-  return ''.join(final_lines)
+  return list(filterfalse(_keep_line, original_lines))

@@ -159,8 +159,8 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
       # iteration again.
       print("Will merge the following modules to fix the cyclical dependency:")
       file_moves = dict()
-      for module, ms_to_merge_into in filter(lambda e: e[1],
-                                             modules_to_move.items()):
+      for module, ms_to_merge_into in sorted(filter(lambda e: e[1],
+                                                    modules_to_move.items())):
         print("    Into '%s':" % module)
         for module_to_move in ms_to_merge_into:
           print("        %s" % module_to_move)
@@ -172,8 +172,8 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
 
   mapping.fix_module_names(MODULE_MAP, DEPENDENCY_MAP)
 
-  print("-------- Final count of files in each modules --------")
-  for module in MODULE_MAP:
+  print("-------- Final count of files in each modules after joining --------")
+  for module in sorted(MODULE_MAP):
     length = len(MODULE_MAP.get_fragment_list(module))
     if length:
       print("     Module %s: %d" % (module, length))

@@ -456,7 +456,7 @@ def write_module_mapping(srcdir, module_map):
 
   modules_to_delete = list()
   for module in tqdm(sorted(module_map),
-                     desc="Writing new modules...",
+                     desc="Writing new modules",
                      total=len(module_map),
                      unit='module'):
     if not module_map.is_tainted(module):

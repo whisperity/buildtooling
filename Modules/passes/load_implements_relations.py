@@ -20,7 +20,7 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):
                              desc="Finding implemented headers",
                              unit='file'):
     with open(directive_file, 'r') as directive_handle:
-      for line in reversed(list(directive_handle)):
+      for line in directive_handle:
         # Parse the output of the directive file. A line is formatted like:
         #     main.cpp##something.h
         try:
