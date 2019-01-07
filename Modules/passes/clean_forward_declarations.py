@@ -53,4 +53,4 @@ def main(MODULE_MAP,
       if not (modules_of_fwding_file & modules_of_definition):
         # Mark the forward declaration for removal if the declaration and the
         # definition are not in the same module.
-        file_remove_list.append((line, symbol))
+        file_remove_list.append((line - 1, symbol))

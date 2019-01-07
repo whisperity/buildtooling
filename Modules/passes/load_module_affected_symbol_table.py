@@ -61,12 +61,11 @@ def main(START_FOLDER):
         try:
           file, line, _, symbol_name = line.strip().split('##')
           file = utils.strip_folder(START_FOLDER, file)
-          line = int(line) - 1  # 1-based index to 0-based index conversion.
 
           file_symbol_list = forward_declarations.get(file, set())
           if not file_symbol_list:
             forward_declarations[file] = file_symbol_list
-          file_symbol_list.add((line, symbol_name))
+          file_symbol_list.add((int(line), symbol_name))
         except ValueError as ve:
           tqdm.write("Forward declaration parse failed, because: %s" % str(ve),
                      file=sys.stderr)
