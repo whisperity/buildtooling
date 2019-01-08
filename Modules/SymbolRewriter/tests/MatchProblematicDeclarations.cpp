@@ -794,3 +794,32 @@ int main()
 
     ASSERT_EQ(R.size(), 0);
 }
+
+TEST(MatchProblematicDeclarations, LocalInlineMethod)
+{
+    FileMap map = {
+        {"/main.cpp", R"FILE(
+inline int f();
+
+int main()
+{
+    return f();
+}
+
+inline int f()
+{
+    return 1;
+}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "/main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 3);
+    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 2, 12));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 6, 12));
+    ASSERT_TRUE(nameMatchedAtPosition(R, "f", 9, 12));
+
+}

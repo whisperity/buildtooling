@@ -378,6 +378,22 @@ private:
             // Identifiers without a name cannot be forward declared in writing.
             return;
 
+        if (const auto* Fun = dyn_cast<FunctionDecl>(ND))
+            if (const FunctionDecl* FunDef = Fun->getDefinition())
+            {
+                const SourceLocation& DefLoc = SM.getSpellingLoc(
+                    FunDef->getBeginLoc());
+                if (DefLoc.isValid() && SM.isInMainFile(DefLoc) &&
+                    SM.isInMainFile(SLoc))
+                {
+                    // If the function is forward declared *and* defined in the
+                    // same file, then it is most likely just a coding
+                    // convention of a "local" symbol (and the code writers did
+                    // not care about the symbol name having external linkage).
+                    return;
+                }
+            }
+
         SymbolTableDumper.AddForwardDeclaration(
             Filename,
             SM.getSpellingLineNumber(SLoc),
@@ -407,7 +423,8 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
             functionDecl(TUInternalTraits),
             varDecl(TUInternalTraits),
             recordDecl(TUInternalTraits),
-            typedefNameDecl(TUInternalTraits)
+            typedefNameDecl(TUInternalTraits),
+            functionDecl(isInline(), isExpansionInMainFile())
         };
         for (auto Matcher : ProblematicNamedDeclarations)
             AddIDBoundMatcher<HandleDeclarations>(Matcher);
@@ -431,6 +448,7 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
             // where a parent matcher can't be used...
             // (These extra cases are not considered valid later on.)
             declRefExpr(to(functionDecl(LocalInTheTU))),
+            declRefExpr(to(functionDecl(isInline(), isExpansionInMainFile()))),
             declRefExpr(to(varDecl(LocalInTheTU)))
         };
         for (auto Matcher : ProblematicDeclUsages)
