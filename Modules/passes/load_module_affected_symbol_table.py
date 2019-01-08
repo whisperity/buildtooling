@@ -29,10 +29,11 @@ def main(START_FOLDER):
           file, _, _, symbol_name = line.strip().split('##')
           file = utils.strip_folder(START_FOLDER, file)
 
-          symbol_file_list = definitions.get(symbol_name, set())
-          if not symbol_file_list:
-            definitions[symbol_name] = symbol_file_list
-          symbol_file_list.add(file)
+          utils.append_to_dict_element(definitions,
+                                       symbol_name,
+                                       file,
+                                       set(),
+                                       set.add)
         except ValueError as ve:
           tqdm.write("Definition parse failed, because: %s" % str(ve),
                      file=sys.stderr)
@@ -62,10 +63,11 @@ def main(START_FOLDER):
           file, line, _, symbol_name = line.strip().split('##')
           file = utils.strip_folder(START_FOLDER, file)
 
-          file_symbol_list = forward_declarations.get(file, set())
-          if not file_symbol_list:
-            forward_declarations[file] = file_symbol_list
-          file_symbol_list.add((int(line), symbol_name))
+          utils.append_to_dict_element(forward_declarations,
+                                       file,
+                                       (int(line), symbol_name),
+                                       set(),
+                                       set.add)
         except ValueError as ve:
           tqdm.write("Forward declaration parse failed, because: %s" % str(ve),
                      file=sys.stderr)

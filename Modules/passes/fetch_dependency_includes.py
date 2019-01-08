@@ -2,6 +2,7 @@ import codecs
 import sys
 
 from ModulesTSMaker import include
+import utils
 from utils.progress_bar import tqdm
 
 PASS_NAME = "Fetch dependency \"#include\"s from files"
@@ -33,7 +34,6 @@ def main(MODULE_MAP,
     if not lines_to_remove_from_file:
       continue
 
-    stored_remove_list = REMOVE_LINES_FROM_FILES.get(file, list())
-    if not stored_remove_list:
-      REMOVE_LINES_FROM_FILES[file] = stored_remove_list
-    stored_remove_list += lines_to_remove_from_file
+    utils.append_to_dict_element(REMOVE_LINES_FROM_FILES,
+                                 file,
+                                 lines_to_remove_from_file)

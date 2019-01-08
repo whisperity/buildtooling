@@ -2,7 +2,7 @@ import codecs
 import os
 import subprocess
 import sys
-from itertools import filterfalse, islice, tee
+from itertools import filterfalse, tee
 
 __all__ = ['progress_bar', 'graph_visualisation']
 
@@ -96,3 +96,24 @@ def replace_at_position(filename, line, col, from_str, to_str):
           % (filename, line, col, from_str, to_str, str(type(e)), str(e)),
           file=sys.stderr)
     return False
+
+
+def append_to_dict_element(Dict, key, value,
+                           default_value = None,
+                           append_method = list.__iadd__):
+  """
+  Appends the value to the key element of the dict. In case the dict does not
+  contain the given element, a default value is constructed. The append is done
+  with the given appender function.
+
+  This method is useful for falsy-capable containers.
+  """
+  if default_value is None:
+    default_value = list()
+
+  stored_element = Dict.get(key, default_value)
+  if not stored_element:
+    # An empty container was retrieved
+    Dict[key] = stored_element
+
+  append_method(stored_element, value)
