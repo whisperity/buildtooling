@@ -23,6 +23,18 @@ def filename_to_directive(filename):
   return '#include "%s"' % filename
 
 
+def get_included_files(text):
+  """
+  Filters the given source text for include directives and returns the file
+  names included (as the directives specify, the include paths are not
+  searched).
+  """
+  # QUESTION: Maybe a better approach is needed, like 'clang-scan-deps'?
+  return list(map(directive_to_filename,
+                  filter(lambda l: l.startswith('#include '),
+                         text.splitlines())))
+
+
 def filter_imports_from_includes(filename,
                                  text,
                                  modulemap,
@@ -36,7 +48,8 @@ def filter_imports_from_includes(filename,
   specifies that what files belonging to a module depend on what files
   belonging to other modules.
 
-  :returns: The index and line contents of lines that should be removed.
+  :returns: The line numbers and line contents of lines that should be removed,
+  and the list of include directives (and line numbers) that should be kept.
   """
 
   # Get the "first" module from the module map read earlier which contains
@@ -55,7 +68,7 @@ def filter_imports_from_includes(filename,
   include_lines = sorted(include_lines, key=itemgetter(1))
   if not include_lines:
     # If the file contains no "#include" statements, no need to do anything.
-    return
+    return list(), list()
 
   lines_to_keep = []
   for i, line in tqdm(include_lines,
@@ -99,4 +112,5 @@ def filter_imports_from_includes(filename,
     # Lines we don't know nothing about should be kept too.
     return True
 
-  return list(filterfalse(_keep_line, original_lines))
+  return list(filterfalse(_keep_line, original_lines)), \
+         lines_to_keep

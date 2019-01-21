@@ -1,5 +1,13 @@
 from collections import deque
 
+try:
+  import networkx as nx
+except ImportError as e:
+  print("Error! A dependency of this tool could not be satisfied. Please "
+        "install the following Python package via 'pip' either to the "
+        "system, or preferably create a virtualenv.")
+  raise
+
 
 def is_cutting_edge(edge, partitioning):
   """

@@ -591,8 +591,45 @@ def fix_module_names(module_map, dependency_map):
   apply_file_moves(module_map, dependency_map, files_to_move_for_fixup)
 
 
+def clean_cycles_from_external_graph(external_include_graph):
+  """
+  The :param external_include_graph: might contain cycles between files if the
+  project is laid out like that and the include analysis did not find cycles
+  that were broken up by the preprocessor in an actual compilation.
+
+  The cycles are only a problem if these are between internal files. If the
+  cycle contains external files between the internal ones in the *same* module,
+  it can freely be broken up as the actual build will *most likely* never pull
+  a cycle, and these files are only used to sorting the "module-internal"
+  files.
+
+  :return: None. The graph is modified in place.
+  """
+  module_attr = nx.get_node_attributes(external_include_graph, 'modules')
+  for c in nx.simple_cycles(external_include_graph):
+    internals_in_cycle = list(v for v in c if module_attr[v])
+    if not internals_in_cycle:
+      # If the cycle contains no internal files it can safely be ignored.
+      continue
+
+    try:
+      modules_in_cycle = set(module_attr[v][0] for v in internals_in_cycle)
+      if len(modules_in_cycle) != 1:
+        raise ValueError("A cycle (%s) is between multiple modules (%s), and "
+                         "thus cannot be fixed."
+                         % (', '.join(c), ', '.join(modules_in_cycle)))
+    except IndexError:
+      raise NotImplementedError("An internal file in the cycle '%s' does not "
+                                "belong to a module?" % ', '.join(c))
+
+    idx_of_last_internal = c.index(internals_in_cycle[-1])
+    last_edge = (c[idx_of_last_internal - 1], c[idx_of_last_internal])
+    external_include_graph.remove_edge(*last_edge)
+
+
 def write_topological_order(module_file,
                             regex,
+                            external_include_graph,
                             intramodule_dependencies):
   """
   Calculate and write topological ordering of files based on the built
@@ -606,7 +643,11 @@ def write_topological_order(module_file,
 
   :param intramodule_dependencies: The list of dependencies, in a k -> [v]
   format, where file k (key) depends on files in the v (value) list.
+
+  :param external_include_graph: This graph contains file->file dependencies
+  in order of an (u, v) edge specifying that file u depends on file v.
   """
+
   try:
     # Topological sort requires that dependencies are expressed in a (u, v)
     # edge which means u depends on v. The edges created from
@@ -615,11 +656,26 @@ def write_topological_order(module_file,
     # appear (in topological order) before the dependency. Flipping the edges
     # is required because of this.
     graph = nx.DiGraph(intramodule_dependencies).reverse(True)
-    topological = nx.topological_sort(graph)
-  except nx.NetworkXUnfeasible:
+
+    # Add the external dependency edges between files of the current module
+    # only, and of course keep the "external" files.
+    extern_sub_graph = external_include_graph.copy()
+    external_attribute = nx.get_node_attributes(extern_sub_graph, 'external')
+    extern_sub_graph.remove_nodes_from([
+      v for v in extern_sub_graph
+      if external_attribute[v] is False and v not in graph.nodes])
+    clean_cycles_from_external_graph(extern_sub_graph)
+
+    # Reverse the edges for the exact same reason as above.
+    graph.update(extern_sub_graph.reverse(False))
+
+    topological = list(nx.topological_sort(graph))  # Force generation for exc.
+  except nx.NetworkXUnfeasible as e:
     print("Error! Circular dependency found in header files used in module "
           "%s. Module file cannot be rewritten!" % module_file,
           file=sys.stderr)
+    print(e)
+
     return False
 
   with codecs.open(module_file, 'r+',
@@ -651,6 +707,9 @@ def write_topological_order(module_file,
     # Rewrite matching lines to the topological order of files.
     new_includes = []
     for file in topological:
+      if external_attribute.get(file, False):
+        continue
+
       # Modules usually include files relative to the module file's own
       # location, but the script knows them relative to the working directory
       # at the start...

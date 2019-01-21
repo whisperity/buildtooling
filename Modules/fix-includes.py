@@ -11,6 +11,7 @@ import re
 import sys
 
 import utils
+from utils.graph import nx
 from passes import PassLoader
 
 PassLoader.register_global(
@@ -59,8 +60,8 @@ MODULE_MAP, DEPENDENCY_MAP = \
 PassLoader.register_global('MODULE_MAP', MODULE_MAP)
 PassLoader.register_global('DEPENDENCY_MAP', DEPENDENCY_MAP)
 
-# Register a collection of lines that need to be cleaned later on.
 PassLoader.register_global('REMOVE_LINES_FROM_FILES', dict())
+PassLoader.register_global('EXTERNAL_INCLUDE_GRAPH', nx.DiGraph())
 
 PassLoader.execute_pass('load_implements_relations')
 DEFINITIONS, FORWARD_DECLARATIONS = \

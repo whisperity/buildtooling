@@ -7,7 +7,11 @@ from utils.progress_bar import tqdm
 PASS_NAME = "Write module CPPM files"
 
 
-def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
+def main(START_FOLDER,
+         MODULE_MAP,
+         DEPENDENCY_MAP,
+         HEADER_FILE_REGEX,
+         EXTERNAL_INCLUDE_GRAPH):
   # Make sure the module-to-module import directives are in the dependency map,
   # as this stage operates based on them.
   DEPENDENCY_MAP.synthesize_intermodule_imports()
@@ -25,7 +29,7 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
   # a good order.
   topological_success = True
   for module in tqdm(sorted(MODULE_MAP),
-                     desc="Sorting headers",
+                     desc="Sorting files",
                      unit='module'):
     files_in_module = MODULE_MAP.get_fragment_list(module)
     headers_in_module = filter(HEADER_FILE_REGEX.search, files_in_module)
@@ -49,11 +53,12 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):
         # uses-dependency relation.
         intramodule_dependencies[dependee_file] = dep_list
 
-    topological_success = topological_success and \
-                          mapping.write_topological_order(
-                            MODULE_MAP.get_filename(module),
-                            HEADER_FILE_REGEX,
-                            intramodule_dependencies)
+    module_success = mapping.write_topological_order(
+      MODULE_MAP.get_filename(module),
+      HEADER_FILE_REGEX,
+      EXTERNAL_INCLUDE_GRAPH,
+      intramodule_dependencies)
+    topological_success = topological_success and module_success
 
   if not topological_success:
     print("Error: one of more module files' interface (header) part could not "

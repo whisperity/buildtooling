@@ -4,7 +4,9 @@ import subprocess
 import sys
 from itertools import filterfalse, tee
 
-__all__ = ['progress_bar', 'graph_visualisation']
+__all__ = ['graph',
+           'graph_visualisation',
+           'progress_bar']
 
 
 def partition(pred, iterable):
@@ -99,8 +101,8 @@ def replace_at_position(filename, line, col, from_str, to_str):
 
 
 def append_to_dict_element(Dict, key, value,
-                           default_value = None,
-                           append_method = list.__iadd__):
+                           default_value=None,
+                           append_method=list.__iadd__):
   """
   Appends the value to the key element of the dict. In case the dict does not
   contain the given element, a default value is constructed. The append is done
