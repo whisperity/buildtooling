@@ -823,3 +823,68 @@ inline int f()
     ASSERT_TRUE(nameMatchedAtPosition(R, "f", 9, 12));
 
 }
+
+TEST(MatchProblematicDeclarations, ClassInlineMethod)
+{
+    FileMap map = {
+        {"/header.h", R"FILE(
+class X
+{
+  public:
+    inline int x() { return 1; }
+};
+)FILE"},
+        {"/main.cpp", R"FILE(
+#include "/header.h"
+
+int main()
+{
+    return X{}.x();
+}
+
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "/main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 0);
+}
+
+TEST(MatchProblematicDeclarations, ClassInlineMethodDefinedInImplFile)
+{
+    // This example is taken from a live project... I suppose the original
+    // intention was to make sure a member function can only be called from the
+    // (otherwise non-template-) class' implmentation file.
+
+    FileMap map = {
+        {"/header.h", R"FILE(
+class X
+{
+  public:
+    inline int x();
+};
+)FILE"},
+        {"/main.cpp", R"FILE(
+#include "/header.h"
+
+inline int X::x()
+{
+    return 1;
+}
+
+int main()
+{
+    return X{}.x();
+}
+
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "/main.cpp", TrivialCompileCommand);
+    auto R = FRD->getReplacements();
+
+    ASSERT_EQ(R.size(), 0);
+}

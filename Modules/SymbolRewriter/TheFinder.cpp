@@ -80,8 +80,31 @@ public:
 
     void run(const MatchFinder::MatchResult& Result) override
     {
-        const auto* ND = Result.Nodes.getNodeAs<NamedDecl>("id");
-        assert(ND && "Something matched as `id` but it wasn't a `NamedDecl`?");
+        const NamedDecl* ND = nullptr;
+        if ((ND = Result.Nodes.getNodeAs<FunctionDecl>("inline")))
+        {
+            // If an 'inline' function is matched in the TU, it must be checked
+            // if it is an inline member function (otherwise wrongfully, but
+            // this is an example from live code) implemented in an
+            // implementation (source) file...
+
+            // (In reality, the 'inline' specifier here only makes sure that
+            // even though the member is "public" (if it is...) it can ONLY be
+            // called from the implementation file itself.
+
+            // The matcher matches this function because it appears to be a
+            // full TU-local inline, but it has to be ignored if it is a class
+            // member.
+            if (isa<CXXMethodDecl>(ND))
+                return;
+        }
+        else
+        {
+            // Otherwise try the default matcher bind...
+            ND = Result.Nodes.getNodeAs<NamedDecl>("id");
+            assert(ND && "Something matched as `id` but it wasn't a "
+                         "`NamedDecl`?");
+        }
 
         if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
             // If the declaration hasn't a name, it cannot be renamed.
@@ -132,6 +155,18 @@ public:
             return HandleDeclRefExpr(
                 Result.Nodes.getNodeAs<DeclRefExpr>("declRefExpr"),
                 *Result.SourceManager);
+        if (Item->first == "declRefExpr-toInline")
+        {
+            const auto* DRE = Result.Nodes.getNodeAs<DeclRefExpr>(
+                "declRefExpr-toInline");
+            // Same logic as in 'HandleDeclarations': the inline member defined
+            // "out of line" (...) must not be renamed, nor its usages
+            // rewritten.
+            if (isa<CXXMethodDecl>(DRE->getDecl()))
+                return;
+
+            return HandleDeclRefExpr(DRE, *Result.SourceManager);
+        }
 
         assert(std::string("Should not have reached this point!").empty());
     }
@@ -416,6 +451,9 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
    , Implementses(ImplementsEdges)
    , SymbolTableDumper(SymbolTableDumper)
 {
+    auto InlineFunctionInMainFile = functionDecl(
+        isInline(), isExpansionInMainFile());
+
     // Create matchers for named declarations which are to be renamed.
     {
         auto ProblematicNamedDeclarations = {
@@ -423,11 +461,13 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
             functionDecl(TUInternalTraits),
             varDecl(TUInternalTraits),
             recordDecl(TUInternalTraits),
-            typedefNameDecl(TUInternalTraits),
-            functionDecl(isInline(), isExpansionInMainFile())
+            typedefNameDecl(TUInternalTraits)
         };
         for (auto Matcher : ProblematicNamedDeclarations)
             AddIDBoundMatcher<HandleDeclarations>(Matcher);
+
+        AddIDBoundMatcher<HandleDeclarations>(
+            "inline", InlineFunctionInMainFile);
     }
 
     // Add a matchers that will report the usage of such a named declaration.
@@ -448,11 +488,13 @@ MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
             // where a parent matcher can't be used...
             // (These extra cases are not considered valid later on.)
             declRefExpr(to(functionDecl(LocalInTheTU))),
-            declRefExpr(to(functionDecl(isInline(), isExpansionInMainFile()))),
             declRefExpr(to(varDecl(LocalInTheTU)))
         };
         for (auto Matcher : ProblematicDeclUsages)
             AddIDBoundMatcher<HandleUsagePoints>("declRefExpr", Matcher);
+
+        AddIDBoundMatcher<HandleUsagePoints>(
+            "declRefExpr-toInline", declRefExpr(to(InlineFunctionInMainFile)));
     }
 
     // Add the matcher handle responsible for collecting what the current main
