@@ -56,9 +56,13 @@ class PassLoader():
       if pass_name not in cls.loaded_passes:
         raise KeyError("The stage '%s' was not found." % pass_name)
 
+    pass_module = cls.loaded_passes[pass_name]
+    print("Executing pass '%s' (%s)..."
+          % (pass_name, pass_module.DESCRIPTION))
+
     # Dynamically figure out what "global" variables (state) the stage needs
     # based on the signature and map it from the stored globals.
-    fun = cls.loaded_passes[pass_name].main
+    fun = pass_module.main
     params = inspect.signature(fun).parameters
     globals_needed_by_params = dict(
       filter(lambda e: e[0] in params, cls.cfg_globals.items()))

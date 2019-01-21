@@ -12,7 +12,7 @@ from ModulesTSMaker import mapping
 from utils.progress_bar import tqdm
 
 
-PASS_NAME = "Join modules together based on forward declarations' coupling"
+DESCRIPTION = "Join modules together based on forward declarations' coupling"
 
 
 def main(MODULE_MAP,

@@ -7,7 +7,7 @@ from ModulesTSMaker import include
 import utils
 from utils.progress_bar import tqdm
 
-PASS_NAME = "Fetch dependency \"#include\"s from files"
+DESCRIPTION = "Fetch dependency \"#include\"s from files"
 
 
 def _recurse_includes(start_folder,

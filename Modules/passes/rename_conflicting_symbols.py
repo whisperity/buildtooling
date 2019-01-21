@@ -4,7 +4,7 @@ import utils
 from utils.progress_bar import tqdm
 
 
-PASS_NAME = "Rename conflicting symbols"
+DESCRIPTION = "Rename conflicting symbols"
 
 
 def main(START_FOLDER):

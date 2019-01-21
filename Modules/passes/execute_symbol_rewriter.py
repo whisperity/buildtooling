@@ -5,7 +5,7 @@ import sys
 import utils
 
 
-PASS_NAME = "Execute SymbolRewriter"
+DESCRIPTION = "Execute SymbolRewriter"
 
 
 def main(SYMBOL_REWRITER_BINARY, COMPILE_COMMAND_JSON, START_FOLDER):

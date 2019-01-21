@@ -12,7 +12,7 @@ except ImportError as e:
 from ModulesTSMaker import mapping
 
 
-PASS_NAME = "Solve dependency cycles by merging graphs"
+DESCRIPTION = "Solve dependency cycles by merging graphs"
 
 
 def _fold_cycles(module_map, dependency_map):

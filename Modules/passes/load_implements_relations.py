@@ -5,7 +5,7 @@ import utils
 from utils.progress_bar import tqdm
 
 
-PASS_NAME = "Load \"implements\" relations"
+DESCRIPTION = "Load \"implements\" relations"
 
 
 def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):

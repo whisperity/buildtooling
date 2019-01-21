@@ -4,7 +4,7 @@ import utils
 from utils.progress_bar import tqdm
 
 
-PASS_NAME = "Load \"module affected\" symbol table details"
+DESCRIPTION = "Load \"module affected\" symbol table details"
 
 
 def main(START_FOLDER):

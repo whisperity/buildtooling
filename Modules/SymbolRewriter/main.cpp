@@ -6,12 +6,13 @@
 #include <clang/Tooling/CompilationDatabase.h>
 #include <llvm/Support/FileSystem.h>
 
+#include <whisperity/ThreadsafeOStream.h>
+#include <whisperity/threadpool.h>
+
 #include "Executor.h"
 #include "ImplementsEdges.h"
-#include "LockedFile.h"
 #include "Replacement.h"
 #include "SymbolTableDump.h"
-#include "threadpool.h"
 
 using namespace clang;
 using namespace clang::tooling;
@@ -19,9 +20,6 @@ using namespace llvm::sys::fs;
 using namespace SymbolRewriter;
 using namespace whisperity;
 
-/**
- * TODO: Document the whole tool.
- */
 int main(int argc, const char** argv)
 {
     if (argc < 2 || argc > 3)

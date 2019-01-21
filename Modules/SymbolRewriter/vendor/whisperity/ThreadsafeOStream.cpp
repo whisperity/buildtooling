@@ -1,4 +1,4 @@
-#include "LockedFile.h"
+#include "ThreadsafeOStream.h"
 
 #include <iostream>
 

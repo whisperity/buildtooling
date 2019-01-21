@@ -1,5 +1,5 @@
-#ifndef WHISPERITY_LOCKEDFILE_H
-#define WHISPERITY_LOCKEDFILE_H
+#ifndef WHISPERITY_THREADSAFEOSTREAM_H
+#define WHISPERITY_THREADSAFEOSTREAM_H
 
 #include <atomic>
 #include <fstream>
@@ -103,4 +103,4 @@ private:
 
 } // namespace whisperity
 
-#endif // WHISPERITY_LOCKEDFILE_H
+#endif // WHISPERITY_THREADSAFEOSTREAM_H

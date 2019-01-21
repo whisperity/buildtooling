@@ -4,7 +4,7 @@ from operator import itemgetter
 
 from utils.progress_bar import tqdm
 
-PASS_NAME = "Remove unnecessary lines from source files"
+DESCRIPTION = "Remove unnecessary lines from source files"
 
 
 def main(REMOVE_LINES_FROM_FILES):

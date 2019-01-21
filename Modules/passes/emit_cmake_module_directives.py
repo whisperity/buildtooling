@@ -1,7 +1,7 @@
 import os
 import sys
 
-PASS_NAME = "Emit CMake module directives"
+DESCRIPTION = "Emit CMake module directives"
 
 
 def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):

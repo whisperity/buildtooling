@@ -3,7 +3,7 @@ import sys
 from ModulesTSMaker import mapping
 
 
-PASS_NAME = "Load module mapping"
+DESCRIPTION = "Load module mapping"
 
 
 def main(START_FOLDER):

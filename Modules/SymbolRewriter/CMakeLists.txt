@@ -31,6 +31,8 @@ if(NOT ${LLVM_ENABLE_RTTI})
   add_compile_options(-fno-rtti)
 endif()
 
+add_subdirectory(vendor)
+
 set(LLVM_LIBRARIES_USED "")
 list(APPEND LLVM_LIBRARIES_USED
     clang
@@ -50,12 +52,12 @@ add_library(RewritingTool STATIC
     TheFinder.cpp)
 
 add_executable(SymbolRewriter
-    LockedFile.cpp
     main.cpp)
+target_include_directories(SymbolRewriter SYSTEM PUBLIC vendor)
 target_link_libraries(SymbolRewriter
     RewritingTool
     ${LLVM_LIBRARIES_USED}
-    pthread)
+    WhisperityHelper)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     find_package(GTest)
