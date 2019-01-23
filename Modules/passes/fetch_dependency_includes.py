@@ -136,3 +136,5 @@ def main(START_FOLDER,
                       known_external_includes=list(
                         map(include.directive_to_filename,
                             map(itemgetter(1), lines_to_keep))))
+
+  print()  # Line feed after TQDM progress bar so it's not overwritten.

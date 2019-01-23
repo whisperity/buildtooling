@@ -106,7 +106,7 @@ def main(MODULE_MAP,
 
   mapping.fix_module_names(MODULE_MAP, DEPENDENCY_MAP)
   logging.essential(
-    "-------- Final count of files in each modules after merging --------")
+    "-------- Final count of files in each modules after forwards --------")
   for module in sorted(MODULE_MAP):
     length = len(MODULE_MAP.get_fragment_list(module))
     if length:

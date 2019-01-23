@@ -3,6 +3,7 @@ import inspect
 import os
 import sys
 
+from utils import logging
 
 PACKAGE_DIR = os.path.dirname(__file__)
 __all__ = ['PassLoader']
@@ -57,8 +58,8 @@ class PassLoader():
         raise KeyError("The stage '%s' was not found." % pass_name)
 
     pass_module = cls.loaded_passes[pass_name]
-    print("Executing pass '%s' (%s)..."
-          % (pass_name, pass_module.DESCRIPTION))
+    logging.essential("\n!>>>>>>> Executing pass '%s' (%s)... <<<<<<<!"
+                      % (pass_name, pass_module.DESCRIPTION))
 
     # Dynamically figure out what "global" variables (state) the stage needs
     # based on the signature and map it from the stored globals.

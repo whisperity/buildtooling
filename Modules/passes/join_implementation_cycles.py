@@ -99,6 +99,7 @@ def _fold_cycles(module_map, dependency_map):
                          module_B),
                       end='')
 
+    logging.verbose('')  # Line feed after the arrows joined above.
     maximal_coupling_edge = max(coupling_strength, key=itemgetter(1)). \
       split(' -> ')
     to_merge, merge_into = maximal_coupling_edge[0], maximal_coupling_edge[1]

@@ -106,8 +106,6 @@ LOGGING.add_argument('--verbose',
 
 ARGS = PARSER.parse_args()
 
-print(ARGS)
-
 # ---------------------- Sanity check invocation of tool ----------------------
 
 PassLoader.register_global('COMPILE_COMMAND_JSON',
