@@ -2,6 +2,7 @@ import importlib.util
 import inspect
 import os
 import sys
+import time
 
 from utils import logging
 
@@ -15,8 +16,9 @@ class PassLoader():
   configuration globals.
   """
 
-  loaded_passes = {}
-  cfg_globals = {}
+  loaded_passes = dict()
+  cfg_globals = dict()
+  timing_informations = list()
 
   @classmethod
   def load_stage(cls, pass_name):
@@ -70,4 +72,9 @@ class PassLoader():
     binding = inspect.signature(fun).bind(**globals_needed_by_params)
     binding.apply_defaults()
 
-    return fun(*binding.args, **binding.kwargs)
+    started = time.time()
+    returns = fun(*binding.args, **binding.kwargs)
+    ended = time.time()
+
+    cls.timing_informations.append((pass_name, started, ended))
+    return returns

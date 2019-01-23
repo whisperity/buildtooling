@@ -7,6 +7,7 @@ Return codes:
 """
 
 import argparse
+import datetime
 import os
 import re
 import sys
@@ -32,6 +33,7 @@ PARSER = argparse.ArgumentParser(
 PARSER.add_argument('compilation_database',
                     type=str,
                     help="Path to the compilation database of the project.")
+
 PARSER.add_argument('modulescript',
                     type=str,
                     help="Path to the location where the Module Maker's CMake "
@@ -54,6 +56,12 @@ PARSER.add_argument('--force-reanalysis',
                          "project as analysis takes O(build time) to complete."
                          "Specifying this flag will re-run the analysis even "
                          "if the marker for successful analysis is found.")
+
+PARSER.add_argument('--profile',
+                    action='store_true',
+                    help="Show profiling information at the end of execution "
+                         "about how much each individual pass' execution "
+                         "took.")
 
 CONFIGS = PARSER.add_argument_group('fine-tune configuration arguments')
 
@@ -183,3 +191,17 @@ PassLoader.execute_pass('rename_conflicting_symbols')
 PassLoader.execute_pass('remove_lines_from_source')
 PassLoader.execute_pass('write_module_files')
 PassLoader.execute_pass('emit_cmake_module_directives')
+
+# --------------------------------- Profiling ---------------------------------
+if ARGS.profile:
+  print("====================================================================")
+  for i, tupl in enumerate(PassLoader.timing_informations):
+    pass_name, start, end = tupl
+
+    start_human = datetime.datetime.fromtimestamp(start).strftime(
+      r'%Y-%m-%d %H:%M:%S.%f')
+    end_human = datetime.datetime.fromtimestamp(end).strftime(
+      r'%Y-%m-%d %H:%M:%S.%f')
+    delta = datetime.timedelta(seconds=end - start)
+    print("#%d. Pass %s\n        started at %s, ended at %s, took %s."
+          % (i, pass_name, start_human, end_human, delta))
