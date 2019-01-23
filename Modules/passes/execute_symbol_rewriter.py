@@ -56,7 +56,7 @@ def main(SYMBOL_REWRITER_BINARY,
     now = datetime.datetime.now()
     f.write("Successful analysis done at: ")
     f.write(now.isoformat())
-    f.write(".\n")
+    f.write(" .\n")
 
   # The SYMBOL_REWRITER_BINARY emits some definition text files which are
   # parsed and used by later steps. However, for certain translation units,

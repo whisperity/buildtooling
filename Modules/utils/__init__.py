@@ -97,9 +97,11 @@ def replace_at_position(filename, line, col, from_str, to_str):
 
       return True
   except Exception as e:
-    print("Couldn't do replacement in '%s' (%d:%d) '%s' -> '%s' because %s: %s"
-          % (filename, line, col, from_str, to_str, str(type(e)), str(e)),
-          file=sys.stderr)
+    logging.verbose("Couldn't do replacement in '%s' (%d:%d) '%s' -> '%s' "
+                    "because %s: %s"
+                    % (filename, line, col, from_str, to_str,
+                       str(type(e)), str(e)),
+                    file=sys.stderr)
     return False
 
 

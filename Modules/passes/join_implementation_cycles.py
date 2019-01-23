@@ -10,9 +10,10 @@ except ImportError as e:
   raise
 
 from ModulesTSMaker import mapping
+from utils import logging
 
 
-DESCRIPTION = "Solve dependency cycles by merging graphs"
+DESCRIPTION = "Solve dependency cycles by merging module contents"
 
 
 def _fold_cycles(module_map, dependency_map):
@@ -71,16 +72,17 @@ def _fold_cycles(module_map, dependency_map):
     lambda e: len(e[1]) == cycle_lengths_minimum,
     dependency_paths.items()))
 
-  print("Found %d shortest cycles with the length of %d, trying to merge..."
-        % (len(minimum_long_cycles), cycle_lengths_minimum))
+  logging.normal("Found %d shortest cycles with the length of %d, trying to "
+                 "merge..." % (len(minimum_long_cycles),
+                               cycle_lengths_minimum))
 
   modules_marked_for_moving = set()
   modules_to_merge = dict()  # k -> [v]: List of modules to merge into 'k'.
   for _, cycle in minimum_long_cycles:
     # For every cycle detected, try folding it towards the left. Each iteration
     # does one fold on every cycle.
-    print("Circular dependency between modules found on the following path:\n"
-          "    %s" % cycle[0], end='')
+    logging.verbose("Circular dependency between modules found on the "
+                    "following path:\n    %s" % cycle[0], end='')
 
     # Calculate the coupling strength between the modules in the cycle.
     coupling_strength = dict()
@@ -92,10 +94,10 @@ def _fold_cycles(module_map, dependency_map):
         coupling_strength[module_A + ' -> ' + module_B] += \
           len(dependencies_in_B)
 
-      print(" -> (%d) %s "
-            % (coupling_strength[module_A + ' -> ' + module_B], module_B),
-            end='')
-    print()
+      logging.verbose(" -> (%d) %s "
+                      % (coupling_strength[module_A + ' -> ' + module_B],
+                         module_B),
+                      end='')
 
     maximal_coupling_edge = max(coupling_strength, key=itemgetter(1)). \
       split(' -> ')
@@ -135,7 +137,6 @@ def _fold_cycles(module_map, dependency_map):
     merge_list.append(to_merge)
     modules_marked_for_moving.add(to_merge)
 
-  print()
   return modules_to_merge
 
 
@@ -146,24 +147,25 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
 
   iteration_count = 1
   while True:
-    print(
+    logging.essential(
       "========->> Begin iteration %d trying to merge cycles.. <<-========"
       % iteration_count)
 
     modules_to_move = _fold_cycles(MODULE_MAP, DEPENDENCY_MAP)
     if modules_to_move is True:
-      print("Nothing to do.")
+      logging.essential("Nothing to do.")
       break
     else:
       # Alter the module map with the calculated moves, and try running the
       # iteration again.
-      print("Will merge the following modules to fix the cyclical dependency:")
+      logging.verbose("Will merge the following modules to fix the cyclical "
+                      "dependency:")
       file_moves = dict()
       for module, ms_to_merge_into in sorted(filter(lambda e: e[1],
                                                     modules_to_move.items())):
-        print("    Into '%s':" % module)
+        logging.verbose("    Into '%s':" % module)
         for module_to_move in ms_to_merge_into:
-          print("        %s" % module_to_move)
+          logging.verbose("        %s" % module_to_move)
           for file in MODULE_MAP.get_fragment_list(module_to_move):
             file_moves[file] = module
 
@@ -172,8 +174,9 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
 
   mapping.fix_module_names(MODULE_MAP, DEPENDENCY_MAP)
 
-  print("-------- Final count of files in each modules after joining --------")
+  logging.essential(
+    "-------- Final count of files in each modules after joining --------")
   for module in sorted(MODULE_MAP):
     length = len(MODULE_MAP.get_fragment_list(module))
     if length:
-      print("     Module %s: %d" % (module, length))
+      logging.essential("     Module %s: %d" % (module, length))

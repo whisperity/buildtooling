@@ -12,10 +12,10 @@ except ImportError as e:
   raise
 
 from ModulesTSMaker import mapping, util
-from utils import graph
+from utils import graph, logging
 
 
-DESCRIPTION = "Solve potential module import cycles"
+DESCRIPTION = "Solve potential module import cycles by splitting modules"
 
 
 def _create_flow_for_cycle_graph(cycle,
@@ -148,7 +148,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   # dependee instead.
   for file in sorted(files_to_move):
     # Iterate copy of the initial files, the dict is modified in the iteration.
-    print(" ? File candidate for moving: %s" % file)
+    logging.verbose(" ? File candidate for moving: %s" % file)
     if file + ' ->' in flow_graph.nodes and '-> ' + file in flow_graph.nodes:
       # Move the files that are the starting points of edges leading into the
       # previously marked files.
@@ -160,7 +160,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
         paths = []
 
       del files_to_move[file]
-      print(" ! File cannot be moved: %s" % file)
+      logging.verbose(" ! File cannot be moved: %s" % file)
       cut_candidates = deque(sorted(set(map(
         lambda e: e[0].replace('-> ', '').replace(' ->', ''),
         filter(lambda e: file in e[1], cutting_edges)))))
@@ -168,7 +168,8 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
       # Iterate as long as we have other termini of cutting.
       while cut_candidates:
         new_move_candidate = cut_candidates.popleft()
-        print(" ? File candidate for moving: %s" % new_move_candidate)
+        logging.verbose(" ? File candidate for moving: %s"
+                        % new_move_candidate)
         files_to_move[new_move_candidate] = None
 
         if '-> ' + new_move_candidate in flow_graph.nodes and \
@@ -203,7 +204,8 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
             # The move candidate is part of a path between the insolvent
             # dependency. Try to see if other nodes in the path could be
             # moved...
-            print(" ! File cannot be moved: %s" % new_move_candidate)
+            logging.verbose(" ! File cannot be moved: %s"
+                            % new_move_candidate)
             del files_to_move[new_move_candidate]
 
             def _handle_direction(generator):
@@ -250,8 +252,8 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   for file in files_moving_without_new_module_name:
     files_to_move[file] = new_module_name
 
-  print("Will move the following files to fix the cycle:")
-  print("    %s" % '\n    '.join(sorted(files_to_move)))
+  logging.verbose("Will move the following files to fix the cycle:")
+  logging.verbose("    %s" % '\n    '.join(sorted(files_to_move)))
 
   return files_to_move
 
@@ -264,9 +266,9 @@ def _parallel(cycle, module_map, dependency_map):
   # Make sure it is "actually" a cycle.
   cycle.append(cycle[0])
 
-  print("-------------------------------------------------------------")
-  print("Circular dependency between modules found on the following path:\n"
-        "    %s" % ' -> '.join(cycle))
+  logging.verbose("----------------------------------------------------------")
+  logging.verbose("Circular dependency between modules found on the following "
+                  "path:\n    %s" % ' -> '.join(cycle))
 
   # Create a graph that contains the files that span the dependencies that
   # resulted in the cycle.
@@ -274,8 +276,8 @@ def _parallel(cycle, module_map, dependency_map):
   for module_A, module_B in itertools.zip_longest(cycle[:-1], cycle[1:]):
     # (E.g. iterates A -> B, B -> C, C -> A)
 
-    print("Between modules %s -> %s, the following files include each "
-          "other:" % (module_A, module_B))
+    logging.verbose("Between modules %s -> %s, the following files include "
+                    "each other:" % (module_A, module_B))
     files = dependency_map.get_files_creating_dependency_between(module_A,
                                                                  module_B)
     for file_in_A, files_in_B in sorted(files.items()):
@@ -287,11 +289,10 @@ def _parallel(cycle, module_map, dependency_map):
         # skip it.
         continue
 
-      print("    %s:" % file_in_A)
-      print("        %s" % '\n        '.join(files[file_in_A]))
-      cycle_file_graph.add_edges_from(zip(
-        itertools.repeat(file_in_A),
-        files[file_in_A]))
+      logging.verbose("    %s:" % file_in_A)
+      logging.verbose("        %s" % '\n        '.join(files[file_in_A]))
+      cycle_file_graph.add_edges_from(zip(itertools.repeat(file_in_A),
+                                          files[file_in_A]))
 
   # Map every file that spans the circular dependency to the module they
   # belong to.
@@ -378,8 +379,8 @@ def get_circular_dependency_resolution(pool, module_map, dependency_map):
   # within each group the 2nd, etc.
   smallest_cycles.sort(key=lambda l: ','.join(l))
 
-  print("Found %d smallest cycles of length %d between modules."
-        % (len(smallest_cycles), smallest_cycles_length))
+  logging.normal("Found %d smallest cycles of length %d between modules."
+                 % (len(smallest_cycles), smallest_cycles_length))
 
   args = zip(smallest_cycles,
              itertools.repeat(module_map),
@@ -408,21 +409,22 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
   iteration_count = 1
   with multiprocessing.Pool() as pool:
     while True:
-      print(
+      logging.essential(
         "========->> Begin iteration %d trying to break cycles.. <<-========"
         % iteration_count)
 
       files_to_move = get_circular_dependency_resolution(
         pool, MODULE_MAP, DEPENDENCY_MAP)
       if files_to_move is False:
-        print("Error! The modules contain circular dependencies on each other "
-              "which cannot be resolved automatically by splitting them.",
-              file=sys.stderr)
+        logging.essential("Error! The modules contain circular dependencies "
+                          "on each other which cannot be resolved "
+                          "automatically by splitting them.",
+                          file=sys.stderr)
         sys.exit(1)
       elif files_to_move is True:
         # If the resolution of the cycles is to do nothing, there are no issues
         # with the mapping anymore.
-        print("Nothing to do.")
+        logging.essential("Nothing to do.")
         break
       else:
         # Alter the module map with the calculated moves, and try running the

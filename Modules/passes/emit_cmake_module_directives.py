@@ -19,7 +19,7 @@ def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):
         out.write(inp.read())
   except Exception as e:
     utils.logging.essential("Error: Couldn't deploy 'Modules.cmake', because: "
-                            + str(e),
+                            "%s" % e,
                             file=sys.stderr)
     sys.exit(1)
 
@@ -42,6 +42,6 @@ def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):
                   % (module, dependency))
   except Exception as e:
     utils.logging.essential("Error: Couldn't write set_modules() directives, "
-                            "because: " + str(e),
+                            "because: %s " % e,
                             file=sys.stderr)
     sys.exit(1)
