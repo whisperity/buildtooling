@@ -2,7 +2,7 @@ from ModulesTSMaker import mapping
 from utils.progress_bar import tqdm
 
 
-DESCRIPTION = "Move implementation files to new modules"
+DESCRIPTION = "Move implementation files to the module of their interfaces"
 
 
 def main(MODULE_MAP, DEPENDENCY_MAP, HEADER_FILE_REGEX):

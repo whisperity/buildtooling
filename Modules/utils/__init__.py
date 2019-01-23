@@ -4,8 +4,11 @@ import subprocess
 import sys
 from itertools import filterfalse, tee
 
+from . import logging
+
 __all__ = ['graph',
            'graph_visualisation',
+           'logging',
            'progress_bar']
 
 

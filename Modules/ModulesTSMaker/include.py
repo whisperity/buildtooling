@@ -3,7 +3,7 @@ import sys
 from itertools import filterfalse
 from operator import itemgetter
 
-from utils import partition
+from utils import logging, partition
 from utils.progress_bar import tqdm
 
 
@@ -88,9 +88,9 @@ def filter_imports_from_includes(filename,
       included = os.path.join(os.path.dirname(filename), included)
       module = __get_module(included)
       if not module:
-        tqdm.write("%s: Include file '%s' not found in module mapping."
-                   % (filename, original_included),
-                   file=sys.stderr)
+        logging.normal("%s: Include file '%s' not found in module mapping."
+                       % (filename, original_included),
+                       file=sys.stderr)
         lines_to_keep.append((i, line))
         continue
 

@@ -1,7 +1,10 @@
 import os
 import sys
 
-DESCRIPTION = "Emit CMake module directives"
+import utils
+
+
+DESCRIPTION = "Emit CMake set_module directives for build"
 
 
 def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):
@@ -15,8 +18,9 @@ def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):
                 'r') as inp:
         out.write(inp.read())
   except Exception as e:
-    print("Error: Couldn't deploy 'Modules.cmake', because: " + str(e),
-          file=sys.stderr)
+    utils.logging.essential("Error: Couldn't deploy 'Modules.cmake', because: "
+                            + str(e),
+                            file=sys.stderr)
     sys.exit(1)
 
   try:
@@ -37,6 +41,7 @@ def main(MODULE_MAP, MODULES_CMAKE_SCRIPT):
           f.write("set_module_dependency(%s %s)\n"
                   % (module, dependency))
   except Exception as e:
-    print("Error: Couldn't write set_modules() directives, because: " + str(e),
-          file=sys.stderr)
+    utils.logging.essential("Error: Couldn't write set_modules() directives, "
+                            "because: " + str(e),
+                            file=sys.stderr)
     sys.exit(1)

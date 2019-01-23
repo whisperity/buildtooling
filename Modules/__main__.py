@@ -48,6 +48,13 @@ PARSER.add_argument('--symbol-rewriter',
                          "Python driver. (The binary is searched in the PATH "
                          "environment variable if not overridden.)")
 
+PARSER.add_argument('--force-reanalysis',
+                    action='store_true',
+                    help="SymbolRewriter is not ran twice for the same "
+                         "project as analysis takes O(build time) to complete."
+                         "Specifying this flag will re-run the analysis even "
+                         "if the marker for successful analysis is found.")
+
 CONFIGS = PARSER.add_argument_group('fine-tune configuration arguments')
 
 
@@ -82,7 +89,8 @@ LOGGING = PARSER.add_argument_group('output verbosity arguments')
 
 LOGGING.add_argument('--hide-compiler',
                      action='store_true',
-                     help="Hide the output of the compiler.")
+                     help="Hide the output (warnings and errors) of the "
+                          "compiler in the analysis phase.")
 
 LOGGING.add_argument('--hide-nonessential',
                      action='store_true',
@@ -125,12 +133,16 @@ if not success:
         file=sys.stderr)
   sys.exit(2)
 
+# Set up the logging configuration of the user.
+utils.logging.set_configuration('compiler', not ARGS.hide_compiler)
+utils.logging.set_configuration('normal', not ARGS.hide_nonessential)
+utils.logging.set_configuration('verbose', ARGS.verbose)
+
 # ------------------------- Real execution begins now -------------------------
 
-PassLoader.register_global('LOGGING', {'compiler': not ARGS.hide_compiler,
-                                       'essential': not ARGS.hide_nonessential,
-                                       'verbose': ARGS.verbose})
-
+# Perform an analysis on the symbols and the project structure to know what
+# has to be touched.
+PassLoader.register_global('ALWAYS_DO_ANALYSIS', ARGS.force_reanalysis)
 PassLoader.execute_pass('execute_symbol_rewriter')
 
 # Load the necessary knowledge about the project.

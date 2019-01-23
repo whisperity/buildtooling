@@ -4,7 +4,7 @@ import utils
 from utils.progress_bar import tqdm
 
 
-DESCRIPTION = "Load \"module affected\" symbol table details"
+DESCRIPTION = "Load symbol table details from analysis output"
 
 
 def main(START_FOLDER):
@@ -34,19 +34,16 @@ def main(START_FOLDER):
                                        file,
                                        set(),
                                        set.add)
-        except ValueError as ve:
-          tqdm.write("Definition parse failed, because: %s" % str(ve),
-                     file=sys.stderr)
         except IndexError:
-          tqdm.write("Invalid directive in file:\n\t%s" % line,
-                     file=sys.stderr)
+          utils.logging.essential("Invalid directive in file:\n\t%s" % line,
+                                  file=sys.stderr)
           continue
 
   for symbol, files in filter(lambda e: len(e[1]) > 1,
                               definitions):
-    print("WARNING: Symbol '%s' is defined by multiple files: %s"
-          % (symbol, ', '.join(sorted(files))),
-          file=sys.stderr)
+    utils.logging.normal("WARNING: Symbol '%s' is defined by multiple files: "
+                         "%s" % (symbol, ', '.join(sorted(files))),
+                         file=sys.stderr)
 
   forward_declarations = dict()
   fwddecl_files = list(filter(
@@ -68,12 +65,9 @@ def main(START_FOLDER):
                                        (int(line), symbol_name),
                                        set(),
                                        set.add)
-        except ValueError as ve:
-          tqdm.write("Forward declaration parse failed, because: %s" % str(ve),
-                     file=sys.stderr)
         except IndexError:
-          tqdm.write("Invalid directive in file:\n\t%s" % line,
-                     file=sys.stderr)
+          utils.logging.essential("Invalid directive in file:\n\t%s" % line,
+                                  file=sys.stderr)
           continue
 
   return definitions, forward_declarations

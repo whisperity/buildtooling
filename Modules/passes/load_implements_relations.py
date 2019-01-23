@@ -5,7 +5,7 @@ import utils
 from utils.progress_bar import tqdm
 
 
-DESCRIPTION = "Load \"implements\" relations"
+DESCRIPTION = "Load \"implements\" relations from the analysed compilations"
 
 
 def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):
@@ -29,11 +29,12 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):
           implemented = utils.strip_folder(START_FOLDER, parts[1])
           DEPENDENCY_MAP.add_dependency(implementee, implemented, 'implements')
         except ValueError as ve:
-          tqdm.write("Implements relation failed, because: %s" % str(ve),
-                     file=sys.stderr)
+          utils.logging.normal("Implements relation failed, because: %s"
+                                % str(ve),
+                                file=sys.stderr)
         except IndexError:
-          tqdm.write("Invalid directive in file:\n\t%s" % line,
-                     file=sys.stderr)
+          utils.logging.essential("Invalid directive in file:\n\t%s" % line,
+                                  file=sys.stderr)
           continue
 
   # The implements relations could make the whole setup insane when a
@@ -43,28 +44,31 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):
   # made, as further splits won't fix the input.
   insanity = mapping.get_dependency_map_implementation_insanity(DEPENDENCY_MAP)
   if insanity:
-    print("Error: The initial input of module-assignments given to the "
-          "algorithm is insane. At least one interface (\"header\") file is "
-          "implemented by translation units assigned to multiple different "
-          "modules.", file=sys.stderr)
+    utils.logging.essential("Error: The initial input of module-assignments "
+                            "given to the algorithm is insane. At least one "
+                            "interface (\"header\") file is implemented by "
+                            "translation units assigned to multiple different "
+                            "modules.", file=sys.stderr)
 
     for implemented, module_and_files in sorted(insanity.items()):
       module_of_implemented = next(
         MODULE_MAP.get_modules_for_fragment(implemented),
         None)
-      print("Symbols of file '%s' in module %s (%s) is implemented by:"
-            % (implemented,
-               module_of_implemented,
-               MODULE_MAP.get_filename(module_of_implemented)),
-            file=sys.stderr)
+      utils.logging.normal(
+        "Symbols of file '%s' in module %s (%s) is implemented by:"
+        % (implemented,
+           module_of_implemented,
+           MODULE_MAP.get_filename(module_of_implemented)),
+        file=sys.stderr)
       for module, file_list in sorted(module_and_files.items()):
-        print("    in module '%s' (%s):"
-              % (module, MODULE_MAP.get_filename(module)), file=sys.stderr)
+        utils.logging.normal("    in module '%s' (%s):"
+                             % (module, MODULE_MAP.get_filename(module)),
+                             file=sys.stderr)
         for file in sorted(file_list):
-          print("        %s" % file, file=sys.stderr)
+          utils.logging.normal("        %s" % file, file=sys.stderr)
 
-    print("Please review and change your code, or remove the problematic "
-          "interface files from the assignment, reducing them to pure "
-          "headers.",
-          file=sys.stderr)
+    utils.logging.essential(
+      "Please review and change your code, or remove the problematic "
+      "interface files from the assignment, reducing them to pure headers.",
+      file=sys.stderr)
     sys.exit(1)

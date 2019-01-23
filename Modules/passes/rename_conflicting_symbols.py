@@ -4,14 +4,16 @@ import utils
 from utils.progress_bar import tqdm
 
 
-DESCRIPTION = "Rename conflicting symbols"
+DESCRIPTION = "Rename conflicting symbols in the merged files"
 
 
 def main(START_FOLDER):
-  # The symbol rewriter binary creates outputs for files specifying in which
-  # file at what position a rename must be made so concatenated implementation
-  # files will work without name collisions that previously were not a problem
-  # when implementation files were different TUs.
+  """
+  The symbol rewriter binary creates outputs for files specifying in which
+  file at what position a rename must be made so concatenated implementation
+  files will work without name collisions that previously were not a problem
+  when implementation files were different TUs.
+  """
   symbol_rename_files = list(filter(lambda s: s.endswith("-badsymbols.txt"),
                                     utils.walk_folder(START_FOLDER)))
   for directive_file in tqdm(symbol_rename_files,
@@ -36,9 +38,9 @@ def main(START_FOLDER):
                                               int(row), int(col),
                                               from_str, to_str)
           if not success:
-            tqdm.write("Replacement failed for directive: %s" % line,
-                       file=sys.stderr)
+            utils.logging.normal("Replacement failed for directive: %s" % line,
+                                 file=sys.stderr)
         except IndexError:
-          tqdm.write("Invalid directive in file:\n\t%s" % line,
-                     file=sys.stderr)
+          utils.logging.essential("Invalid directive in file:\n\t%s" % line,
+                                  file=sys.stderr)
           continue

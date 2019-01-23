@@ -1,9 +1,10 @@
 import sys
 
 from ModulesTSMaker import mapping
+from utils import logging
 
 
-DESCRIPTION = "Load module mapping"
+DESCRIPTION = "Load initial module mapping from the source folder(s)"
 
 
 def main(START_FOLDER):
@@ -12,8 +13,9 @@ def main(START_FOLDER):
   dependency_map = mapping.DependencyMap(module_map)
 
   if duplicates:
-    print("Error: Some files are included into multiple modules. These files "
-          "had been removed from the mapping!", file=sys.stderr)
-    print('\n'.join(duplicates), file=sys.stderr)
+    logging.essential("Error: Some files are included into multiple modules. "
+                      "These files had been removed from the mapping!",
+                      file=sys.stderr)
+    logging.normal('\n'.join(duplicates), file=sys.stderr)
 
   return module_map, dependency_map

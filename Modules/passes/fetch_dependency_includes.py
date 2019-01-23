@@ -7,7 +7,7 @@ from ModulesTSMaker import include
 import utils
 from utils.progress_bar import tqdm
 
-DESCRIPTION = "Fetch dependency \"#include\"s from files"
+DESCRIPTION = "Fetch dependency-creating \"#include\" directives from sources"
 
 
 def _recurse_includes(start_folder,
@@ -53,8 +53,8 @@ def _recurse_includes(start_folder,
                        encoding='utf-8', errors='replace') as f:
         known_external_includes = include.get_included_files(f.read())
     except OSError as e:
-      print("OSerror on file '%s': %s" % (file, str(e)),
-            file=sys.stderr)
+      utils.logging.normal("OSerror on file '%s': %s" % (file, str(e)),
+                              file=sys.stderr)
       return False
 
   for next_include in known_external_includes:
@@ -106,8 +106,8 @@ def main(START_FOLDER,
       with codecs.open(file, 'r', encoding='utf-8', errors='replace') as f:
         content = f.read()
     except OSError as e:
-      tqdm.write("Couldn't read file '%s': %s" % (file, e),
-                 file=sys.stderr)
+      utils.logging.essential("Couldn't read file '%s': %s" % (file, e),
+                              file=sys.stderr)
       continue
 
     lines_to_remove_from_file, lines_to_keep = \

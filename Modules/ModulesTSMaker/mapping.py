@@ -14,7 +14,7 @@ except ImportError as e:
         "system, or preferably create a virtualenv.")
   raise
 
-from utils import strip_folder, walk_folder
+from utils import logging, strip_folder, walk_folder
 from utils.progress_bar import tqdm
 from . import include
 
@@ -382,9 +382,9 @@ def get_module_mapping(srcdir):
   mapping = ModuleMapping()
 
   # Read the files and create the mapping.
-  for file in tqdm(walk_folder(srcdir),
+  file_list = list(walk_folder(srcdir))
+  for file in tqdm(file_list,
                    desc="Searching for module files...",
-                   total=len(list(walk_folder(srcdir))),
                    unit='file'):
     if not file.endswith('cppm'):
       continue
@@ -399,10 +399,10 @@ def get_module_mapping(srcdir):
         line = line.replace('export module ', '')
         match = MODULE_MACRO.match(line)
         if not match:
-          tqdm.write("Error! Cannot read input file '%s' because "
-                     "'export module' line is badly formatted.\n%s"
-                     % (file, line),
-                     file=sys.stderr)
+          logging.essential("Error! Cannot read input file '%s' because "
+                            "'export module' line is badly formatted.\n%s"
+                            % (file, line),
+                            file=sys.stderr)
           break
         module_name = match.group('name')
         break
@@ -421,9 +421,9 @@ def get_module_mapping(srcdir):
         included_local = os.path.join(os.path.dirname(file), included)
 
         if not os.path.isfile(included_local):
-          tqdm.write("Error: '%s' includes '%s' but that file could not be "
-                     "found." % (file, included_local),
-                     file=sys.stderr)
+          logging.normal("Error: '%s' includes '%s' but that file could not "
+                         "be found." % (file, included_local),
+                         file=sys.stderr)
           continue
 
         mapping.add_fragment(module_name,
@@ -668,10 +668,11 @@ def write_topological_order(module_file,
 
     topological = list(nx.topological_sort(graph))  # Force generation for exc.
   except nx.NetworkXUnfeasible as e:
-    print("Error! Circular dependency found in header files used in module "
-          "%s. Module file cannot be rewritten!" % module_file,
-          file=sys.stderr)
-    print(e)
+    logging.essential("Error! Circular dependency found in header files used "
+                      "in module %s. Module file cannot be rewritten!"
+                      % module_file,
+                      file=sys.stderr)
+    logging.essential(e, file=sys.stderr)
 
     return False
 
@@ -696,9 +697,9 @@ def write_topological_order(module_file,
         lines_to_keep.append(l)
 
     if not includes_start_at:
-      print("Error! No inclusion directives found in module file."
-            % module_file,
-            file=sys.stderr)
+      logging.essential("Error! No inclusion directives found in module file."
+                        % module_file,
+                        file=sys.stderr)
       return False
 
     # Rewrite matching lines to the topological order of files.

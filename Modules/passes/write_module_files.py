@@ -1,10 +1,11 @@
 import sys
 
 from ModulesTSMaker import mapping
+from utils import logging
 from utils.progress_bar import tqdm
 
 
-DESCRIPTION = "Write module CPPM files"
+DESCRIPTION = "Write Modules TS declaration (CPPM) files"
 
 
 def main(START_FOLDER,
@@ -61,7 +62,7 @@ def main(START_FOLDER,
     topological_success = topological_success and module_success
 
   if not topological_success:
-    print("Error: one of more module files' interface (header) part could not "
-          "have been sorted properly.",
-          file=sys.stderr)
+    logging.essential("Error: one of more module files' interface (header) "
+                      "part could not have been sorted properly.",
+                      file=sys.stderr)
     sys.exit(1)
