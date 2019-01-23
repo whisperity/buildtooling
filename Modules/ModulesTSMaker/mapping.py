@@ -102,10 +102,7 @@ class ModuleMapping():
         modules_gone_empty.append(module)
 
     for module in modules_gone_empty:
-      # TODO: Allow client code to obtain this deletion information so
-      # physical files can be cleaned up.
-      # del self._map[module]
-      pass
+      del self._map[module]
 
   def get_filename(self, module):
     if module not in self:
