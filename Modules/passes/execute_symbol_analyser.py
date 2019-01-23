@@ -7,11 +7,11 @@ import sys
 import utils
 
 
-DESCRIPTION = "Run SymbolRewriter to analyse the project for problematic " \
+DESCRIPTION = "Run SymbolAnalyser to analyse the project for problematic " \
               "symbols"
 
 
-def main(SYMBOL_REWRITER_BINARY,
+def main(SYMBOL_ANALYSER_BINARY,
          ALWAYS_DO_ANALYSIS,
          COMPILE_COMMAND_JSON,
          START_FOLDER):
@@ -33,7 +33,7 @@ def main(SYMBOL_REWRITER_BINARY,
   # By default don't show the progress messages.
   LOGGING = utils.logging.get_configuration()
   log_args = {'stdout': subprocess.PIPE,
-              'stderr': subprocess.PIPE}
+              'stderr': None}
   if not LOGGING.get('compiler', True):
     # By default, show the compiler warnings/errors, only hide them if the
     # user requested it.
@@ -42,7 +42,7 @@ def main(SYMBOL_REWRITER_BINARY,
     log_args['stdout'] = None
 
   success, _, output = utils.call_process(
-    SYMBOL_REWRITER_BINARY,
+    SYMBOL_ANALYSER_BINARY,
     [os.path.dirname(COMPILE_COMMAND_JSON),
      str(multiprocessing.cpu_count())],
     cwd=START_FOLDER,
@@ -58,7 +58,7 @@ def main(SYMBOL_REWRITER_BINARY,
     f.write(now.isoformat())
     f.write(" .\n")
 
-  # The SYMBOL_REWRITER_BINARY emits some definition text files which are
+  # The SYMBOL_ANALYSER_BINARY emits some definition text files which are
   # parsed and used by later steps. However, for certain translation units,
   # these files might be empty. These can be eliminated to not run extra steps
   # later.

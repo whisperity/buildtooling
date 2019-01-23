@@ -9,8 +9,8 @@ DESCRIPTION = "Load symbol table details from analysis output"
 
 def main(START_FOLDER):
   """
-  The SymbolRewriter binary (which really needs a better name at this point...)
-  emits a partial symbol table that can be used to fine tune module boundaries.
+  The SymbolAnalyser binary emits a partial symbol table that can be used to
+  fine tune module boundaries.
 
   :return: The loaded symbol tables, a pair of dicts.
   """

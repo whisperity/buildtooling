@@ -1,5 +1,5 @@
-#ifndef SYMBOLREWRITER_TEST_H
-#define SYMBOLREWRITER_TEST_H
+#ifndef SYMBOLANALYSER_TEST_H
+#define SYMBOLANALYSER_TEST_H
 
 #include <string>
 #include <vector>
@@ -10,7 +10,7 @@
 #include "ImplementsEdges.h"
 #include "Replacement.h"
 
-using namespace SymbolRewriter;
+using namespace SymbolAnalyser;
 
 extern std::vector<std::string> TrivialCompileCommand;
 
@@ -57,4 +57,4 @@ std::string getReplacementAt(
     size_t Line,
     size_t Col);
 
-#endif // SYMBOLREWRITER_TEST_H
+#endif // SYMBOLANALYSER_TEST_H

@@ -1,12 +1,12 @@
-#ifndef SYMBOLREWRITER_REPLACEMENT_H
-#define SYMBOLREWRITER_REPLACEMENT_H
+#ifndef SYMBOLANALYSER_REPLACEMENT_H
+#define SYMBOLANALYSER_REPLACEMENT_H
 
 #include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 /**
@@ -98,6 +98,6 @@ private:
 void writeReplacementOutput(std::ostream& Output,
                             const FileReplaceDirectives& Directives);
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser
 
-#endif // SYMBOLREWRITER_REPLACEMENT_H
+#endif // SYMBOLANALYSER_REPLACEMENT_H

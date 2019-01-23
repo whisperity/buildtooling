@@ -9,7 +9,7 @@ DESCRIPTION = "Load \"implements\" relations from the analysed compilations"
 
 
 def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):
-  # The SYMBOL_REWRITER_BINARY emits the knowledge about what file implements
+  # The SYMBOL_ANALYSER_BINARY emits the knowledge about what file implements
   # symbols from what other file. This has to be added to the algorithm's
   # knowledge, as Module files (CPPMs) have to contain *both* interface and
   # implementation.

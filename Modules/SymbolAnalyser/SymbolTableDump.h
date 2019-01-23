@@ -1,11 +1,11 @@
-#ifndef SYMBOLREWRITER_SYMBOLTABLEDUMP_H
-#define SYMBOLREWRITER_SYMBOLTABLEDUMP_H
+#ifndef SYMBOLANALYSER_SYMBOLTABLEDUMP_H
+#define SYMBOLANALYSER_SYMBOLTABLEDUMP_H
 
 #include <map>
 #include <set>
 #include <vector>
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 /**
@@ -64,6 +64,6 @@ void writeSymbolForwardDeclarationsOutput(std::ostream& Output,
                                           const std::string& FileToWrite,
                                           const SymbolTableDump& SymbolTable);
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser
 
-#endif // SYMBOLREWRITER_SYMBOLTABLEDUMP_H
+#endif // SYMBOLANALYSER_SYMBOLTABLEDUMP_H

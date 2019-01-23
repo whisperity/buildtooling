@@ -4,9 +4,9 @@
 #include <initializer_list>
 #include <utility>
 
-static SymbolRewriter::SymbolTableDump::SymbolVector EmptySymbolVector{};
+static SymbolAnalyser::SymbolTableDump::SymbolVector EmptySymbolVector{};
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 void SymbolTableDump::AddDefinition(std::string Filepath,
@@ -87,4 +87,4 @@ void writeSymbolForwardDeclarationsOutput(std::ostream& Output,
                << "##" << S.Symbol << std::endl;
 }
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser

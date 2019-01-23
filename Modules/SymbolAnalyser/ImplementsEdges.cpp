@@ -4,7 +4,7 @@
 #include <iostream>
 #include <utility>
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 ImplementsEdges::ImplementsEdges(std::string Filepath)
@@ -40,4 +40,4 @@ void writeImplementsOutput(
             Output << FP << "##" << E.first << "##" << Symbol << std::endl;
 }
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser

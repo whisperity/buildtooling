@@ -3,7 +3,7 @@
 #include <iostream>
 #include <utility>
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 FileReplaceDirectives::FileReplaceDirectives(std::string Filepath,
@@ -89,4 +89,4 @@ void writeReplacementOutput(std::ostream& Output,
     }
 }
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser

@@ -1,11 +1,11 @@
-#ifndef SYMBOLREWRITER_IMPLEMENTSEDGES_H
-#define SYMBOLREWRITER_IMPLEMENTSEDGES_H
+#ifndef SYMBOLANALYSER_IMPLEMENTSEDGES_H
+#define SYMBOLANALYSER_IMPLEMENTSEDGES_H
 
 #include <iosfwd>
 #include <map>
 #include <set>
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 /**
@@ -43,6 +43,6 @@ private:
 void writeImplementsOutput(std::ostream& Output,
                            const ImplementsEdges& Implementses);
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser
 
-#endif // SYMBOLREWRITER_IMPLEMENTSEDGES_H
+#endif // SYMBOLANALYSER_IMPLEMENTSEDGES_H

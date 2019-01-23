@@ -1,5 +1,5 @@
-#ifndef SYMBOLREWRITER_THEVISITOR_H
-#define SYMBOLREWRITER_THEVISITOR_H
+#ifndef SYMBOLANALYSER_THEVISITOR_H
+#define SYMBOLANALYSER_THEVISITOR_H
 
 #include <string>
 #include <vector>
@@ -7,7 +7,7 @@
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include "SymbolTableDump.h"
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 class FileReplaceDirectives;
@@ -47,6 +47,6 @@ private:
     inline void AddIDBoundMatcher(Matcher&& TheMatcher);
 };
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser
 
-#endif // SYMBOLREWRITER_THEVISITOR_H
+#endif // SYMBOLANALYSER_THEVISITOR_H

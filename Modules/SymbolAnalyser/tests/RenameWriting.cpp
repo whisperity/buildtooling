@@ -5,7 +5,7 @@
 
 #include "Replacement.h"
 
-using namespace SymbolRewriter;
+using namespace SymbolAnalyser;
 
 #define ADDR(x) reinterpret_cast<const void *>(x)
 

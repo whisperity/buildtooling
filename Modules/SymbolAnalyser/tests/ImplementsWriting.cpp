@@ -5,7 +5,7 @@
 
 #include "ImplementsEdges.h"
 
-using namespace SymbolRewriter;
+using namespace SymbolAnalyser;
 
 /**
  * Get a dummy implements edge wrapper for a "/main.cpp" file.

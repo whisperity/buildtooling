@@ -17,7 +17,7 @@
 using namespace clang;
 using namespace clang::tooling;
 using namespace llvm::sys::fs;
-using namespace SymbolRewriter;
+using namespace SymbolAnalyser;
 using namespace whisperity;
 
 int main(int argc, const char** argv)
@@ -33,7 +33,7 @@ int main(int argc, const char** argv)
 
     if (argc >= 2 && strncmp(argv[1], "--version", 10) == 0)
     {
-        std::cerr << "SymbolRewriter vX.Y.Z" << std::endl;
+        std::cerr << argv[0] << " vX.Y.Z" << std::endl;
         return 0;
     }
 

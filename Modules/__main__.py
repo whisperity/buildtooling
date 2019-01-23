@@ -38,11 +38,11 @@ PARSER.add_argument('modulescript',
                          "extension could should be unpacked to. THIS FILE "
                          "WILL BE OVERWRITTEN!")
 
-PARSER.add_argument('--symbol-rewriter',
+PARSER.add_argument('--symbol-analyser',
                     type=str,
-                    metavar='SymbolRewriter',
-                    default='SymbolRewriter',
-                    help="Override path to the 'SymbolRewriter' binary which "
+                    metavar='SymbolAnalyser',
+                    default='SymbolAnalyser',
+                    help="Override path to the 'SymbolAnalyser' binary which "
                          "is used to analyse the project. This binary is "
                          "mandatory for success and is shipped with the "
                          "Python driver. (The binary is searched in the PATH "
@@ -50,7 +50,7 @@ PARSER.add_argument('--symbol-rewriter',
 
 PARSER.add_argument('--force-reanalysis',
                     action='store_true',
-                    help="SymbolRewriter is not ran twice for the same "
+                    help="SymbolAnalyser is not ran twice for the same "
                          "project as analysis takes O(build time) to complete."
                          "Specifying this flag will re-run the analysis even "
                          "if the marker for successful analysis is found.")
@@ -102,7 +102,7 @@ LOGGING.add_argument('--hide-nonessential',
 LOGGING.add_argument('--verbose',
                      action='store_true',
                      help="Show more verbose status messages about the steps "
-                          "the algorithm took.")
+                          "the algorithm took, its progress, etc.")
 
 ARGS = PARSER.parse_args()
 
@@ -120,14 +120,14 @@ if not os.path.isfile("CMakeLists.txt"):
         file=sys.stderr)
   sys.exit(2)
 
-SYMBOL_REWRITER_BINARY = ARGS.symbol_rewriter
-PassLoader.register_global('SYMBOL_REWRITER_BINARY', SYMBOL_REWRITER_BINARY)
-success, _, _ = utils.call_process(SYMBOL_REWRITER_BINARY, ['--version'])
+SYMBOL_ANALYSER_BINARY = ARGS.symbol_analyser
+PassLoader.register_global('SYMBOL_ANALYSER_BINARY', SYMBOL_ANALYSER_BINARY)
+success, _, _ = utils.call_process(SYMBOL_ANALYSER_BINARY, ['--version'])
 if not success:
-  print("The 'SymbolRewriter' binary was not found in the PATH environment "
+  print("The 'SymbolAnalyser' binary was not found in the PATH environment "
         "directories. This tool is shipped with the Python script and is a "
         "required dependency.\nBuild the tool and add its output folder to "
-        "PATH, or specify '--symbol-rewriter' manually at invocation.",
+        "PATH, or specify '--symbol-analyser' manually at invocation.",
         file=sys.stderr)
   sys.exit(2)
 
@@ -141,7 +141,7 @@ utils.logging.set_configuration('verbose', ARGS.verbose)
 # Perform an analysis on the symbols and the project structure to know what
 # has to be touched.
 PassLoader.register_global('ALWAYS_DO_ANALYSIS', ARGS.force_reanalysis)
-PassLoader.execute_pass('execute_symbol_rewriter')
+PassLoader.execute_pass('execute_symbol_analyser')
 
 # Load the necessary knowledge about the project.
 MODULE_MAP, DEPENDENCY_MAP = \

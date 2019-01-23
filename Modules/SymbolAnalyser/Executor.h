@@ -1,5 +1,5 @@
-#ifndef SYMBOLREWRITER_EXECUTOR_H
-#define SYMBOLREWRITER_EXECUTOR_H
+#ifndef SYMBOLANALYSER_EXECUTOR_H
+#define SYMBOLANALYSER_EXECUTOR_H
 
 #include <map>
 #include <memory>
@@ -18,7 +18,7 @@ class CompilationDatabase;
 } // namespace clang
 
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 class FileReplaceDirectives;
@@ -87,6 +87,6 @@ ToolResult ExecuteTool(const FileMap& FileMap,
                        const std::string& SourceName,
                        const std::vector<std::string>& CompileCommand);
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser
 
-#endif // SYMBOLREWRITER_EXECUTOR_H
+#endif // SYMBOLANALYSER_EXECUTOR_H

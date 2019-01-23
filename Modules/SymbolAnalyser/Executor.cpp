@@ -16,7 +16,7 @@
 using namespace clang::tooling;
 using namespace llvm::sys::path;
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 ToolExecution::ToolExecution(clang::tooling::CompilationDatabase& CompDb,
@@ -133,4 +133,4 @@ ToolResult ExecuteTool(const FileMap& FileMap,
                            std::move(SymbolTableDumper));
 }
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser

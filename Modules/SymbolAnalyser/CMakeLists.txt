@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(SymbolRewriter CXX)
+project(SymbolAnalyser CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -pedantic \
@@ -51,10 +51,10 @@ add_library(RewritingTool STATIC
     SymbolTableDump.cpp
     TheFinder.cpp)
 
-add_executable(SymbolRewriter
+add_executable(SymbolAnalyser
     main.cpp)
-target_include_directories(SymbolRewriter SYSTEM PUBLIC vendor)
-target_link_libraries(SymbolRewriter
+target_include_directories(SymbolAnalyser SYSTEM PUBLIC vendor)
+target_link_libraries(SymbolAnalyser
     RewritingTool
     ${LLVM_LIBRARIES_USED}
     WhisperityHelper)
@@ -70,7 +70,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
       include_directories(SYSTEM
           ${GTEST_INCLUDE_DIRS})
       include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-      add_executable(RewriteTest
+      add_executable(Test
           Test.cpp
           tests/DeclarationRewriting.cpp
           tests/ImplementsWriting.cpp
@@ -78,17 +78,17 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
           tests/MatchProblematicDeclarations.cpp
           tests/RenameWriting.cpp
           tests/UsagePoints.cpp)
-      target_link_libraries(RewriteTest
+      target_link_libraries(Test
           ${GTEST_BOTH_LIBRARIES}
           RewritingTool
           ${LLVM_LIBRARIES_USED}
           pthread)
 
       add_test(
-          NAME RewriteTest
-          COMMAND RewriteTest)
+          NAME Test
+          COMMAND Test)
       add_custom_target(check
           COMMAND ${CMAKE_CTEST_COMMAND}
-          DEPENDS RewriteTest)
+          DEPENDS Test)
     endif()
 endif()

@@ -9,7 +9,7 @@
 
 using namespace clang;
 using namespace clang::ast_matchers;
-using namespace SymbolRewriter;
+using namespace SymbolAnalyser;
 
 namespace
 {
@@ -441,7 +441,7 @@ private:
 
 } // namespace (anonymous)
 
-namespace SymbolRewriter
+namespace SymbolAnalyser
 {
 
 MatcherFactory::MatcherFactory(FileReplaceDirectives& Replacements,
@@ -575,4 +575,4 @@ void MatcherFactory::AddIDBoundMatcher(Matcher&& TheMatcher)
     this->AddIDBoundMatcher<Handler>("id", TheMatcher);
 }
 
-} // namespace SymbolRewriter
+} // namespace SymbolAnalyser
