@@ -424,7 +424,7 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
       elif files_to_move is True:
         # If the resolution of the cycles is to do nothing, there are no issues
         # with the mapping anymore.
-        logging.essential("Nothing to do.")
+        logging.normal("Nothing to do.")
         break
       else:
         # Alter the module map with the calculated moves, and try running the

@@ -11,6 +11,7 @@ import datetime
 import os
 import re
 import sys
+import time
 
 import utils
 from utils.graph import nx
@@ -116,7 +117,7 @@ ARGS = PARSER.parse_args()
 
 # ---------------------- Sanity check invocation of tool ----------------------
 
-PassLoader.register_global('COMPILE_COMMAND_JSON',
+PassLoader.register_global('COMPILE_COMMANDS_JSON',
                            os.path.abspath(ARGS.compilation_database))
 
 PassLoader.register_global('MODULES_CMAKE_SCRIPT',
@@ -145,6 +146,8 @@ utils.logging.set_configuration('normal', not ARGS.hide_nonessential)
 utils.logging.set_configuration('verbose', ARGS.verbose)
 
 # ------------------------- Real execution begins now -------------------------
+
+START_AT = time.time()
 
 # Perform an analysis on the symbols and the project structure to know what
 # has to be touched.
@@ -192,9 +195,14 @@ PassLoader.execute_pass('remove_lines_from_source')
 PassLoader.execute_pass('write_module_files')
 PassLoader.execute_pass('emit_cmake_module_directives')
 
+END_AT = time.time()
+
 # --------------------------------- Profiling ---------------------------------
 if ARGS.profile:
   print("====================================================================")
+  print("Execution started at %s.\n"
+        % datetime.datetime.fromtimestamp(START_AT)
+        .strftime(r'%Y-%m-%d %H:%M:%S.%f'))
   for i, tupl in enumerate(PassLoader.timing_informations):
     pass_name, start, end = tupl
 
@@ -203,5 +211,13 @@ if ARGS.profile:
     end_human = datetime.datetime.fromtimestamp(end).strftime(
       r'%Y-%m-%d %H:%M:%S.%f')
     delta = datetime.timedelta(seconds=end - start)
-    print("#%d. Pass %s\n        started at %s, ended at %s, took %s."
-          % (i, pass_name, start_human, end_human, delta))
+    print("#%d. Pass %s: started at %s, ended at %s,"
+          "\n%stook %s"
+          % (i, pass_name, start_human, end_human,
+             ' ' * len("#%d. Pass " % i), delta))
+
+  print("\nExecution ended at %s."
+        % datetime.datetime.fromtimestamp(END_AT)
+        .strftime(r'%Y-%m-%d %H:%M:%S.%f'))
+  print("Total execution took %s"
+        % datetime.timedelta(seconds=END_AT - START_AT))

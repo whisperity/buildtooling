@@ -13,7 +13,7 @@ DESCRIPTION = "Run SymbolAnalyser to analyse the project for problematic " \
 
 def main(SYMBOL_ANALYSER_BINARY,
          ALWAYS_DO_ANALYSIS,
-         COMPILE_COMMAND_JSON,
+         COMPILE_COMMANDS_JSON,
          START_FOLDER):
   """
   In the end, after some heuristics, C++ files will be concatenated after one
@@ -43,7 +43,7 @@ def main(SYMBOL_ANALYSER_BINARY,
 
   success, _, output = utils.call_process(
     SYMBOL_ANALYSER_BINARY,
-    [os.path.dirname(COMPILE_COMMAND_JSON),
+    [os.path.dirname(COMPILE_COMMANDS_JSON),
      str(multiprocessing.cpu_count())],
     cwd=START_FOLDER,
     **log_args)

@@ -137,4 +137,4 @@ def main(START_FOLDER,
                         map(include.directive_to_filename,
                             map(itemgetter(1), lines_to_keep))))
 
-  print()  # Line feed after TQDM progress bar so it's not overwritten.
+  print()  # Line feed after tqdm progress bar so it's not overwritten.

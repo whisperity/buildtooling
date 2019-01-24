@@ -154,7 +154,7 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
 
     modules_to_move = _fold_cycles(MODULE_MAP, DEPENDENCY_MAP)
     if modules_to_move is True:
-      logging.essential("Nothing to do.")
+      logging.normal("Nothing to do.")
       break
     else:
       # Alter the module map with the calculated moves, and try running the
