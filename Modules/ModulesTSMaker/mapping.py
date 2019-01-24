@@ -418,8 +418,8 @@ def get_module_mapping(srcdir):
         if not included:
           continue
 
+        # TODO: Handle include paths here.
         included_local = os.path.join(os.path.dirname(file), included)
-
         if not os.path.isfile(included_local):
           logging.normal("Error: '%s' includes '%s' but that file could not "
                          "be found." % (file, included_local),
