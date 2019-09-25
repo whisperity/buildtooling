@@ -75,6 +75,13 @@ PARSER.add_argument('--profile',
                          "about how much each individual pass' execution "
                          "took.")
 
+PARSER.add_argument('-n', '--dry-run',
+                    action='store_true',
+                    help="Execute the algorithm but stop before any "
+                         "modifications would be made to the project files. "
+                         "(Note: This flag does NOT affect the separate "
+                         "'SymbolAnalyser' tool's execution.)")
+
 CONFIGS = PARSER.add_argument_group('fine-tune configuration arguments')
 
 
@@ -205,11 +212,14 @@ PassLoader.register_global('FILTER_FILE_REGEX', None)
 PassLoader.execute_pass('join_implementation_cycles')
 PassLoader.execute_pass('move_forward_declarations_to_defining_module')
 
-# Save the algorithm's output.
-PassLoader.execute_pass('rename_conflicting_symbols')
-PassLoader.execute_pass('remove_lines_from_source')
-PassLoader.execute_pass('write_module_files')
-PassLoader.execute_pass('emit_cmake_module_directives')
+if not ARGS.dry_run:
+  # Save the algorithm's output.
+  PassLoader.execute_pass('rename_conflicting_symbols')
+  PassLoader.execute_pass('remove_lines_from_source')
+  PassLoader.execute_pass('write_module_files')
+  PassLoader.execute_pass('emit_cmake_module_directives')
+else:
+  utils.logging.normal("\n\n'--dry-run' was specified: not writing output.")
 
 END_AT = time.time()
 
