@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import time
+from multiprocessing import cpu_count
 
 import utils
 from utils.graph import nx
@@ -50,6 +51,16 @@ PARSER.add_argument('--symbol-analyser',
                          "mandatory for success and is shipped with the "
                          "Python driver. (The binary is searched in the PATH "
                          "environment variable if not overridden.)")
+
+PARSER.add_argument('-j', '--jobs',
+                    type=int,
+                    metavar='num_threads',
+                    default=0,
+                    help="Override the number of threads allowed to be used "
+                         "for executing analysis and operations. (Certain "
+                         "parts of the executed algorithm can not be run in"
+                         "parallel!) A default value of '0' indicates to use "
+                         "as many threads as available.")
 
 PARSER.add_argument('--force-reanalysis',
                     action='store_true',
@@ -144,6 +155,11 @@ if not success:
 utils.logging.set_configuration('compiler', not ARGS.hide_compiler)
 utils.logging.set_configuration('normal', not ARGS.hide_nonessential)
 utils.logging.set_configuration('verbose', ARGS.verbose)
+
+if ARGS.jobs <= 0:
+  ARGS.jobs = cpu_count()
+utils.logging.verbose("Using '%d' thread(s)..." % ARGS.jobs)
+PassLoader.register_global('THREAD_COUNT', ARGS.jobs)
 
 # ------------------------- Real execution begins now -------------------------
 

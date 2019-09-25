@@ -395,7 +395,7 @@ def get_circular_dependency_resolution(pool, module_map, dependency_map):
   return ret
 
 
-def main(MODULE_MAP, DEPENDENCY_MAP):
+def main(MODULE_MAP, DEPENDENCY_MAP, THREAD_COUNT):
   # Make sure the module-to-module import directives are in the dependency map,
   # as this stage operates based on them.
   DEPENDENCY_MAP.synthesize_intermodule_imports()
@@ -407,7 +407,7 @@ def main(MODULE_MAP, DEPENDENCY_MAP):
   # units -- unfortunately there was no improvement on modularisation made in
   # this case...
   iteration_count = 1
-  with multiprocessing.Pool() as pool:
+  with multiprocessing.Pool(THREAD_COUNT) as pool:
     while True:
       logging.essential(
         "========->> Begin iteration %d trying to break cycles.. <<-========"

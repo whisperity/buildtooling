@@ -14,7 +14,8 @@ DESCRIPTION = "Run SymbolAnalyser to analyse the project for problematic " \
 def main(SYMBOL_ANALYSER_BINARY,
          ALWAYS_DO_ANALYSIS,
          COMPILE_COMMANDS_JSON,
-         START_FOLDER):
+         START_FOLDER,
+         THREAD_COUNT):
   """
   In the end, after some heuristics, C++ files will be concatenated after one
   another into a "new TU" (of the module) which makes this new TU not compile
@@ -44,7 +45,7 @@ def main(SYMBOL_ANALYSER_BINARY,
   success, _, output = utils.call_process(
     SYMBOL_ANALYSER_BINARY,
     [os.path.dirname(COMPILE_COMMANDS_JSON),
-     str(multiprocessing.cpu_count())],
+     str(THREAD_COUNT)],
     cwd=START_FOLDER,
     **log_args)
   if not success:
