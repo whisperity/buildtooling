@@ -1,3 +1,9 @@
+"""
+Python module for graph visualisation which actually executes the visualisation
+methods.
+"""
+
+import math
 
 try:
   import networkx as nx
@@ -8,13 +14,22 @@ except ImportError as e:
         "system, or preferably create a virtualenv.")
   raise
 
-from .graph import is_cutting_edge
+from utils.graph import is_cutting_edge
 
 
 COLOURS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
            '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
            '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
            '#000075', '#808080']
+
+IMPORTANT_EDGE_COLOUR = '#ffa500'
+
+
+def show():
+  """
+  Shows the created graph. This is a blocking call!
+  """
+  plt.show()
 
 
 def draw_dependency_graph(cycle_graph, module_to_files_map):
@@ -66,7 +81,6 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
     Helper function that draws all edges created by applying
     :param edge_endpoint_lambda: on the names in :param name_collection:.
     The created edge will be draw only if it is part of the :var flow: graph.
-
     :param colour_lambda: A lambda that is called with the generated edge
     tuple and decides what colour the edge will be drawn as.
     :param draw_capacity: If set to True, the the capacity of the edge
@@ -88,7 +102,7 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
 
   module_to_colour = {}
   for i, module in enumerate(sorted(module_to_files_map.keys())):
-    module_to_colour[module] = COLOURS[i]
+    module_to_colour[module] = COLOURS[i % len(COLOURS)]
 
     # Draw the nodes of the module.
     module_node_colour = 'black' if module != cycle_start else 'blue'
@@ -100,7 +114,7 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
     if all([module in flow.nodes for module in module_node_list]):
       nx.draw_networkx_nodes(flow, pos,
                              nodelist=module_node_list,
-                             node_color=COLOURS[i],
+                             node_color=module_to_colour[module],
                              node_shape='s')
 
       nx.draw_networkx_labels(flow, pos,
@@ -117,7 +131,7 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
 
     nx.draw_networkx_nodes(flow, pos,
                            nodelist=dependees + dependencies,
-                           node_color=COLOURS[i])
+                           node_color=module_to_colour[module])
     nx.draw_networkx_labels(flow, pos,
                             labels=dict(
                               map(lambda e:
@@ -128,7 +142,8 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
 
     # ... and link them to the module node ...
     def dep_and_file_colour(edge):
-      return '#ffa500' if is_cutting_edge(edge, cut_partition) else '#dddddd'
+      return IMPORTANT_EDGE_COLOUR if is_cutting_edge(edge, cut_partition) \
+             else '#dddddd'
 
     _draw_edge_from_names(dependees,
                           lambda dependee: (module + ' ->', dependee),
@@ -150,7 +165,7 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
     _draw_edge_from_names(module_to_files_map[module],
                           lambda file_in_module: ('-> ' + file_in_module,
                                                   file_in_module + ' ->'),
-                          lambda edge: '#ffa500' if
+                          lambda edge: IMPORTANT_EDGE_COLOUR if
                               is_cutting_edge(edge, cut_partition)
                             else '#666666')
 
@@ -164,7 +179,7 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
     # Show the cut's edges in a different style. A cutting edge is an
     # edge which ends are in different partitions.
     if is_cutting_edge(edge, cut_partition):
-      colour = '#ffa500'
+      colour = IMPORTANT_EDGE_COLOUR
       width = 4.0
       style = 'dashdot'
     else:
@@ -193,8 +208,83 @@ def draw_flow_and_cut(flow, cycle_graph, module_to_files_map,
                            width=width,
                            edge_color=colour,
                            style=style)
-    # nx.draw_networkx_edge_labels(flow, pos,
-    #                              font_size=10,
-    #                              edge_labels=capacities)
+
+  plt.axis('off')
+
+
+def draw_module_joins(modules_marked_for_moving, coupling_strengths):
+  """
+  Draws the visualisation for the step "join_implementation_cycles"
+  This graph can be used to understand how modules will be UNIONed together.
+
+  :param modules_marked_for_moving: A data structure which, for each key, has
+  a list of values, all being modules name. Each value module is to be merged
+  into the module named by the key.
+  :param coupling_strengths: A set of (m, n, s) tuples, where m and n are
+  modules, between which an m -> n directed coupling factor of 's' is to be
+  drawn.
+  """
+  # Create a graph structure from the arguments, and give it to nx-PyDot.
+  graph = nx.MultiDiGraph()
+  for module, merge_list in modules_marked_for_moving.items():
+    graph.add_node(module)
+    for merged_module in merge_list:
+      graph.add_edge(merged_module, module, kind='merge')
+  graph.add_weighted_edges_from(coupling_strengths, kind='strength')
+
+  module_to_colour = dict()
+  min_strength = min(map(lambda s: s[2], coupling_strengths))
+  max_strength = max(map(lambda s: s[2], coupling_strengths))
+
+  pos = nx.nx_pydot.graphviz_layout(graph)
+
+  for i, component in enumerate(nx.weakly_connected_components(graph),
+                                start=1):
+    # Calculate a convenient colouring for the nodes.
+    for idx, module in enumerate(component):
+      module_to_colour[module] = COLOURS[idx % len(COLOURS)]
+
+  # Draw the nodes.
+  nx.draw_networkx_nodes(graph, pos,
+                         node_shape='s',
+                         node_color=list(
+                           map(lambda n: module_to_colour[n], graph.nodes)))
+  nx.draw_networkx_labels(graph, pos,
+                          font_size=8)
+
+  # Draw the strength edges.
+  draw_edges = list()
+  for (m, n, d) in graph.edges(data=True):
+    if d['kind'] != 'strength':
+      continue  # Ignore "special" edges for now.
+
+    w = d['weight']
+    # Calculate the relative strength % (inverse lerp) of the current edge
+    # for the current plot (all the strength edges shown).
+    relative_strength = (w - min_strength) / (max_strength - min_strength)
+
+    draw_edges.append((m, n, w, 1 + relative_strength * 3))
+
+  nx.draw_networkx_edges(graph, pos,
+                         connectionstyle='arc3,rad=0.2',
+                         edgelist=[(e[0], e[1]) for e in draw_edges],
+                         width=[e[3] for e in draw_edges],
+                         edge_color=[module_to_colour[e[0]] for e in
+                                     draw_edges])
+  nx.draw_networkx_edge_labels(graph, pos,
+                               label_pos=0.7,
+                               edge_labels={(e[0], e[1]): e[2] for e in
+                                            draw_edges},
+                               font_size=14)
+
+  # Draw the merge edges.
+  nx.draw_networkx_edges(graph, pos,
+                         style='dotted',
+                         width=0.7,
+                         connectionstyle='bar,fraction=0.3',
+                         edgelist=[(e[0], e[1]) for e in
+                                   graph.edges(data='kind') if
+                                   e[2] == 'merge'],
+                         edge_color=IMPORTANT_EDGE_COLOUR)
 
   plt.axis('off')

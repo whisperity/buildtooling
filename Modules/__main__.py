@@ -16,6 +16,7 @@ from multiprocessing import cpu_count
 
 import utils
 from utils.graph import nx
+from utils.graph_visualisation import load_for as load_graphviz
 from passes import PassLoader
 
 # ------------------- Set up the command-line configuration -------------------
@@ -52,6 +53,13 @@ PARSER.add_argument('--symbol-analyser',
                          "Python driver. (The binary is searched in the PATH "
                          "environment variable if not overridden.)")
 
+PARSER.add_argument('--force-reanalysis',
+                    action='store_true',
+                    help="SymbolAnalyser is not ran twice for the same "
+                         "project as analysis takes O(build time) to complete."
+                         "Specifying this flag will re-run the analysis even "
+                         "if the marker for successful analysis is found.")
+
 PARSER.add_argument('-j', '--jobs',
                     type=int,
                     metavar='num_threads',
@@ -62,12 +70,12 @@ PARSER.add_argument('-j', '--jobs',
                          "parallel!) A default value of '0' indicates to use "
                          "as many threads as available.")
 
-PARSER.add_argument('--force-reanalysis',
+PARSER.add_argument('-n', '--dry-run',
                     action='store_true',
-                    help="SymbolAnalyser is not ran twice for the same "
-                         "project as analysis takes O(build time) to complete."
-                         "Specifying this flag will re-run the analysis even "
-                         "if the marker for successful analysis is found.")
+                    help="Execute the algorithm but stop before any "
+                         "modifications would be made to the project files. "
+                         "(Note: This flag does NOT affect the separate "
+                         "'SymbolAnalyser' tool's execution.)")
 
 PARSER.add_argument('--profile',
                     action='store_true',
@@ -75,12 +83,27 @@ PARSER.add_argument('--profile',
                          "about how much each individual pass' execution "
                          "took.")
 
-PARSER.add_argument('-n', '--dry-run',
+GRAPHS = PARSER.add_argument_group(
+  'graph visualisation arguments',
+  """Visualise the inner state of the algorithm by plotting the graphs in a
+  graphical interface format. Using this option WILL slow down execution and
+  block on each step until the graph window is closed.
+  (Due to this, '--profile' information is worthless in this mode.)
+  If '--jobs' is more than 1, each thread will most likely block independently!
+  Specifying these arguments requires MatPlotLib, GraphViz and TkInter to be
+  installed on the system.""")
+
+GRAPHS.add_argument('--visualise-dependencies',
                     action='store_true',
-                    help="Execute the algorithm but stop before any "
-                         "modifications would be made to the project files. "
-                         "(Note: This flag does NOT affect the separate "
-                         "'SymbolAnalyser' tool's execution.)")
+                    help="")
+
+GRAPHS.add_argument('--visualise-cuts',
+                    action='store_true',
+                    help="")
+
+GRAPHS.add_argument('--visualise-joins',
+                    action='store_true',
+                    help="")
 
 CONFIGS = PARSER.add_argument_group('fine-tune configuration arguments')
 
@@ -163,10 +186,16 @@ utils.logging.set_configuration('compiler', not ARGS.hide_compiler)
 utils.logging.set_configuration('normal', not ARGS.hide_nonessential)
 utils.logging.set_configuration('verbose', ARGS.verbose)
 
+# Set up how many threads can be run.
 if ARGS.jobs <= 0:
   ARGS.jobs = cpu_count()
 utils.logging.verbose("Using '%d' thread(s)..." % ARGS.jobs)
 PassLoader.register_global('THREAD_COUNT', ARGS.jobs)
+
+# Load the visualiser algorithm into the interpreter.
+load_graphviz('dependencies', ARGS.visualise_dependencies)
+load_graphviz('cuts', ARGS.visualise_cuts)
+load_graphviz('joins', ARGS.visualise_joins)
 
 # ------------------------- Real execution begins now -------------------------
 

@@ -11,6 +11,7 @@ except ImportError as e:
 
 from ModulesTSMaker import mapping
 from utils import logging
+from utils.graph_visualisation import get_visualizer as graph_visualisation
 
 
 DESCRIPTION = "Solve dependency cycles by merging module contents"
@@ -78,10 +79,11 @@ def _fold_cycles(module_map, dependency_map):
 
   modules_marked_for_moving = set()
   modules_to_merge = dict()  # k -> [v]: List of modules to merge into 'k'.
+  coupling_strength_collected = list()
   for _, cycle in minimum_long_cycles:
     # For every cycle detected, try folding it towards the left. Each iteration
     # does one fold on every cycle.
-    logging.verbose("Circular dependency between modules found on the "
+    logging.verbose("\nCircular dependency between modules found on the "
                     "following path:\n    %s" % cycle[0], end='')
 
     # Calculate the coupling strength between the modules in the cycle.
@@ -98,6 +100,11 @@ def _fold_cycles(module_map, dependency_map):
                       % (coupling_strength[module_A + ' -> ' + module_B],
                          module_B),
                       end='')
+      # Save away (for visualisation) the coupling strength found in the
+      # current iteration.
+      coupling_strength_collected.append(
+        (module_A, module_B,
+         coupling_strength[module_A + ' -> ' + module_B]))
 
     logging.verbose('')  # Line feed after the arrows joined above.
     maximal_coupling_edge = max(coupling_strength, key=itemgetter(1)). \
@@ -121,23 +128,42 @@ def _fold_cycles(module_map, dependency_map):
       modules_to_merge[dummy_name] = modules_moved_together
 
       if left_module_in_rights_list:
+        logging.verbose("    ??<< Previous merge selected: %s -> %s"
+                        % (to_merge, merge_into))
         modules_to_merge[merge_into].remove(to_merge)
       if right_module_in_lefts_list:
+        logging.verbose("    ??<<   Previous merge selected: %s -> %s"
+                        % (merge_into, to_merge))
         modules_to_merge[to_merge].remove(merge_into)
       modules_marked_for_moving.add(to_merge)
       modules_marked_for_moving.add(merge_into)
+
+      logging.verbose("    ::!!   Creating new module: %s" % dummy_name)
+      logging.verbose("    !! --> Merge decided: %s -> %s"
+                      % (to_merge, dummy_name))
+      logging.verbose("    !! --> Merge decided: %s -> %s"
+                      % (merge_into, dummy_name))
       continue
 
     # Don't move a module twice in the same iteration.
     if to_merge in modules_marked_for_moving:
+      logging.verbose("    !!     Skipping merge, %s is already marked for "
+                      "another merge..." % to_merge)
       continue
 
     merge_list = modules_to_merge.get(merge_into, list())
     if not merge_list:
       modules_to_merge[merge_into] = merge_list
+    logging.verbose("    !! --> Merge decided: %s -> (%d) %s"
+                    % (to_merge,
+                       coupling_strength[to_merge + ' -> ' + merge_into],
+                       merge_into))
     merge_list.append(to_merge)
     modules_marked_for_moving.add(to_merge)
 
+  graph_visualisation('joins').draw_module_joins(
+    modules_to_merge, coupling_strength_collected)
+  graph_visualisation('joins').show()  # Blocking call!
   return modules_to_merge
 
 

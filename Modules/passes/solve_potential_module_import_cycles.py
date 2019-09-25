@@ -13,6 +13,7 @@ except ImportError as e:
 
 from ModulesTSMaker import mapping, util
 from utils import graph, logging
+from utils.graph_visualisation import get_visualizer as graph_visualisation
 
 
 DESCRIPTION = "Solve potential module import cycles by splitting modules"
@@ -299,6 +300,10 @@ def _parallel(cycle, module_map, dependency_map):
   module_to_files_map = module_map.filter_modules_for_fragments(
     cycle_file_graph.nodes)
 
+  graph_visualisation('dependencies').draw_dependency_graph(
+    cycle_file_graph, module_to_files_map)
+  graph_visualisation('dependencies').show()  # Blocking call!
+
   flow = _create_flow_for_cycle_graph(cycle, cycle_file_graph,
                                       module_to_files_map)
 
@@ -306,6 +311,10 @@ def _parallel(cycle, module_map, dependency_map):
   cut_value, partition = nx.minimum_cut(flow,
                                         cycle[0] + ' ->',
                                         '-> ' + cycle[0])
+
+  graph_visualisation('cuts').draw_flow_and_cut(
+    flow, cycle_file_graph, module_to_files_map, cycle[0], partition)
+  graph_visualisation('cuts').show()  # Blocking call!
 
   # Create edges from the file dependency graph in which the edge
   # endpoints show the "direction" of the edge. (Partition contains edges
