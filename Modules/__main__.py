@@ -95,15 +95,21 @@ GRAPHS = PARSER.add_argument_group(
 
 GRAPHS.add_argument('--visualise-dependencies',
                     action='store_true',
-                    help="")
+                    help="Visualize the dependency graph between program code "
+                         "files in the project.")
 
 GRAPHS.add_argument('--visualise-cuts',
                     action='store_true',
-                    help="")
+                    help="Visualize the cuts performed on the "
+                         "module-to-module level, due to cycles between "
+                         "interface dependencies.")
 
 GRAPHS.add_argument('--visualise-joins',
                     action='store_true',
-                    help="")
+                    help="Visualize the joins performed on the "
+                         "module-to-module level, due to cycles introduced "
+                         "by implementatioon code bringing in dependencies "
+                         "to other interfaces.")
 
 CONFIGS = PARSER.add_argument_group('fine-tune configuration arguments')
 
@@ -253,7 +259,12 @@ else:
 END_AT = time.time()
 
 # --------------------------------- Profiling ---------------------------------
-if ARGS.profile:
+# Load the visualiser algorithm into the interpreter.
+if ARGS.profile and (ARGS.visualise_dependencies or
+                     ARGS.visualise_cuts or
+                     ARGS.visualise_joins):
+  print("Profiling information ignored as graph visualisations happened.")
+elif ARGS.profile:
   print("====================================================================")
   print("Execution started at %s.\n"
         % datetime.datetime.fromtimestamp(START_AT)
