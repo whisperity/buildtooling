@@ -107,7 +107,8 @@ def _fold_cycles(module_map, dependency_map):
          coupling_strength[module_A + ' -> ' + module_B]))
 
     logging.verbose('')  # Line feed after the arrows joined above.
-    maximal_coupling_edge = max(coupling_strength, key=itemgetter(1)). \
+    maximal_coupling_edge = max(coupling_strength.items(),
+                                key=itemgetter(1))[0]. \
       split(' -> ')
     to_merge, merge_into = maximal_coupling_edge[0], maximal_coupling_edge[1]
 
@@ -151,12 +152,27 @@ def _fold_cycles(module_map, dependency_map):
                       "another merge..." % to_merge)
       continue
 
+    # Don't move a module into a module that's already being moved.
+    if merge_into in modules_marked_for_moving:
+      logging.verbose("    //     Derailing merge, target %s is "
+                      "already marked for another merge..." % merge_into)
+      # Find which module the originally selected target candidate will
+      # merge into.
+      for m, ms in modules_to_merge.items():
+        if merge_into in ms:
+          merge_into = m
+          break
+      logging.verbose("    \\\\     Target merges into %s"
+                      % merge_into)
+
     merge_list = modules_to_merge.get(merge_into, list())
     if not merge_list:
       modules_to_merge[merge_into] = merge_list
-    logging.verbose("    !! --> Merge decided: %s -> (%d) %s"
+    logging.verbose("    !! --> Merge decided: %s -> (%s) %s"
                     % (to_merge,
-                       coupling_strength[to_merge + ' -> ' + merge_into],
+                       str(
+                         coupling_strength.get(to_merge + ' -> ' + merge_into,
+                                               "no direct coupling")),
                        merge_into))
     merge_list.append(to_merge)
     modules_marked_for_moving.add(to_merge)
