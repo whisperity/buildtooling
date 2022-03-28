@@ -113,7 +113,8 @@ public:
         const std::string& DeclName = ND->getName().str();
         const SourceLocation& Loc = Result.SourceManager->getSpellingLoc(
             ND->getLocation());
-        std::string Filename = Result.SourceManager->getFilename(Loc);
+        const std::string &Filename =
+            Result.SourceManager->getFilename(Loc).str();
         Replacements.SetReplacementBinding(ND->getName().str(), ND);
         if (Loc.isInvalid())
             return;
@@ -175,7 +176,7 @@ private:
     void HandleTypeLoc(const TypeLoc* Loc, const SourceManager& SM)
     {
         const SourceLocation& SLoc = SM.getSpellingLoc(Loc->getBeginLoc());
-        std::string Filename = SM.getFilename(SLoc);
+        const std::string& Filename = SM.getFilename(SLoc).str();
         if (SLoc.isInvalid())
             return;
         if (Replacements.getFilepath() != Filename)
@@ -234,7 +235,7 @@ private:
     void HandleDeclRefExpr(const DeclRefExpr* DRE, const SourceManager& SM)
     {
         const SourceLocation& Loc = SM.getSpellingLoc(DRE->getLocation());
-        std::string Filename = SM.getFilename(Loc);
+        const std::string& Filename = SM.getFilename(Loc).str();
         if (Loc.isInvalid())
             return;
         if (Replacements.getFilepath() != Filename)
@@ -283,7 +284,7 @@ public:
 
         const SourceManager& SM = PD->getASTContext().getSourceManager();
         const SourceLocation& SLoc = SM.getSpellingLoc(PD->getBeginLoc());
-        std::string Filename = SM.getFilename(SLoc);
+        const std::string& Filename = SM.getFilename(SLoc).str();
         if (SLoc.isInvalid())
             return;
         if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
@@ -382,7 +383,7 @@ private:
 
         const SourceManager& SM = ND->getASTContext().getSourceManager();
         const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
-        std::string Filename = SM.getFilename(SLoc);
+        const std::string& Filename = SM.getFilename(SLoc).str();
         if (SLoc.isInvalid())
             return;
         if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
@@ -403,7 +404,7 @@ private:
     {
         const SourceManager& SM = ND->getASTContext().getSourceManager();
         const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
-        std::string Filename = SM.getFilename(SLoc);
+        const std::string& Filename = SM.getFilename(SLoc).str();
         if (SLoc.isInvalid())
             return;
         if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
@@ -565,7 +566,7 @@ MatchFinder::MatchCallback* MatcherFactory::CreateCallback()
 template <class Handler, class Matcher>
 void MatcherFactory::AddIDBoundMatcher(const char* ID, Matcher&& TheMatcher)
 {
-    TheFinder.addMatcher(id(ID, TheMatcher),
+    TheFinder.addMatcher(TheMatcher.bind(ID),
                          this->CreateCallback<Handler>());
 }
 

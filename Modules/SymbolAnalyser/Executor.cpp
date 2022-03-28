@@ -50,12 +50,12 @@ std::string ToolExecution::filepathWithoutExtension() const
 
 std::string ToolExecution::filename() const
 {
-    return stem(Filepath);
+    return stem(Filepath).str();
 }
 
 std::string ToolExecution::extension() const
 {
-    return ::extension(Filepath);
+    return ::extension(Filepath).str();
 }
 
 ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
@@ -63,7 +63,7 @@ ToolResult ExecuteTool(clang::tooling::CompilationDatabase& CompDb,
 {
     ClangTool Tool(CompDb, {Filepath});
     auto Replacements = std::make_unique<FileReplaceDirectives>(
-        Filepath, stem(Filepath));
+        Filepath, stem(Filepath).str());
     auto Implementses = std::make_unique<ImplementsEdges>(Filepath);
     auto SymbolTableDumper = std::make_unique<SymbolTableDump>();
     MatcherFactory Factory{*Replacements,
@@ -113,7 +113,7 @@ ToolResult ExecuteTool(const FileMap& FileMap,
     for (const auto& e : FileMap)
         Tool.mapVirtualFile(e.first, e.second);
     auto Replacements = std::make_unique<FileReplaceDirectives>(
-        SourceName, stem(SourceName));
+        SourceName, stem(SourceName).str());
     auto Implementses = std::make_unique<ImplementsEdges>(SourceName);
     auto SymbolTableDumper = std::make_unique<SymbolTableDump>();
     MatcherFactory Factory{*Replacements,
