@@ -7,11 +7,31 @@ namespace SymbolAnalyser
 {
 
 FileReplaceDirectives::FileReplaceDirectives(std::string Filepath,
-                                             std::string RewritePrefix)
+                                             std::string RewritePrefixStr)
     : Filepath(std::move(Filepath))
-    , RewritePrefix(std::move(RewritePrefix))
+    , RewritePrefix(std::move(RewritePrefixStr))
 {
-    // FIXME: What to do if RewritePrefix invalid (e.g. file is "512FooFoo.cpp")
+    // Fix identifier name if it begins with a number.
+    if (std::isdigit(RewritePrefix.front()))
+    {
+        std::cerr << "WARN: Filename '" << RewritePrefix
+                  << "' starts with digit, renaming..." << std::endl;
+        RewritePrefix.insert(RewritePrefix.begin(), '_');
+    }
+
+    // Fix some more bogus characters that create invalid identifiers.
+    auto It = RewritePrefix.begin();
+    const auto End = RewritePrefix.end();
+    for (auto It = RewritePrefix.begin(); It != End; ++It)
+    {
+        if (*It == '-' || *It == '.')
+        {
+            std::cerr << "WARN: Identifier-invalid character '" << *It
+                      << "' encountered in '" << RewritePrefix
+                      << "', replacing with '_'" << std::endl;
+            *It = '_';
+        }
+    }
 }
 
 void FileReplaceDirectives::SetReplacementBinding(std::string From,

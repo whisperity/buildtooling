@@ -85,7 +85,7 @@ private:
     };
 
     const std::string Filepath;
-    const std::string RewritePrefix;
+    std::string RewritePrefix;
     std::map<const void*, ReplacementPair> Bindings;
     std::vector<Replacement> Replacements;
 
