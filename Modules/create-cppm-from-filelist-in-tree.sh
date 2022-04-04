@@ -6,7 +6,7 @@ echo "export module FULL_NAME_$1;" >> module.cppm
 
 echo -e "\n/* Header files */\n" >> module.cppm
 
-echo * \
+find . -type f \
   | tr ' ' '\n' \
   | grep -E "\.(h|hpp|hxx|hh)$" \
   | sed -s 's/^/#include "/g' \
@@ -14,7 +14,7 @@ echo * \
 
 echo -e "\n/* Source files */\n" >> module.cppm
 
-echo * \
+find . -type f \
   | tr ' ' '\n' \
   | grep -E "\.(c|cpp|cxx|cc|i|ipp|ixx|ii)$" \
   | sed -s 's/^/#include "/g' \
