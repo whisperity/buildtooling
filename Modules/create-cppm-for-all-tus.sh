@@ -17,9 +17,9 @@ make_module() {
 }
 
 
-for file in *;
+for file in $(find . -type f);
 do
-  if [[ "$file" =~ \.c$ || "$file" =~ \.cpp$ ]]
+  if [[ "$file" =~ \.c$ || "$file" =~ \.cpp$ || "$file" =~ \.cxx$ || "$file" =~ \.cc$ ]]
   then
     # For each source files, create a module along with the header, if found.
 
@@ -34,7 +34,7 @@ do
       make_module $(echo ${file} | sed 's/\.c//') \
         ${file}
     fi
-  elif [[ "$file" =~ \.h$ || "$file" =~ \.hpp$ ]]
+  elif [[ "$file" =~ \.h$ || "$file" =~ \.hpp$ || "$file" =~ \.hxx$ || "$file" =~ \.hh$ ]]
   then
     # For each header, create a module from only the header if there is no
     # source file previously handled for it.
