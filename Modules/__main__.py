@@ -57,7 +57,7 @@ PARSER.add_argument('--force-reanalysis',
                     action='store_true',
                     help="SymbolAnalyser is not ran twice for the same "
                          "project as analysis takes O(build time) to complete."
-                         "Specifying this flag will re-run the analysis even "
+                         " Specifying this flag will re-run the analysis even "
                          "if the marker for successful analysis is found.")
 
 PARSER.add_argument('-j', '--jobs',
@@ -66,7 +66,7 @@ PARSER.add_argument('-j', '--jobs',
                     default=0,
                     help="Override the number of threads allowed to be used "
                          "for executing analysis and operations. (Certain "
-                         "parts of the executed algorithm can not be run in"
+                         "parts of the executed algorithm can not be run in "
                          "parallel!) A default value of '0' indicates to use "
                          "as many threads as available.")
 
