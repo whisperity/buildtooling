@@ -16,6 +16,7 @@ int main()
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -46,6 +47,7 @@ int main()
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -75,6 +77,7 @@ int main()
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -105,6 +108,7 @@ int main()
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 4);
@@ -136,6 +140,7 @@ static void f(I i, L l, I& ir, L& lr, I* ip, L* lp, I** ipp,
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 21);
@@ -184,6 +189,7 @@ int main()
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);
@@ -213,6 +219,7 @@ int main()
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 9);
@@ -239,6 +246,7 @@ static const I* cip;
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 3);
@@ -268,6 +276,7 @@ static const    L* clp;
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 4);
@@ -295,6 +304,7 @@ int main()
     // renamed. Neither should the variable of the lambda's function.
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);

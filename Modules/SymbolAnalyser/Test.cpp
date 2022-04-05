@@ -6,12 +6,18 @@
 #include "SymbolTableDump.h"
 
 std::vector<std::string> TrivialCompileCommand = {
-    "/usr/bin/c++",
-    "-std=c++14",
-    "-c",
-    "/main.cpp",
-    "-o",
-    "/main.o"
+  "/usr/bin/c++",
+  "-std=c++14",
+  "-c",
+  "/main.cpp"
+};
+
+std::vector<std::string> NontrivialCompileCommand = {
+  "/usr/bin/c++",
+  "-I/include/root",
+  "-std=c++14",
+  "-c",
+  "/main.cpp"
 };
 
 std::unique_ptr<FileReplaceDirectives> getReplacementsForCompilation(

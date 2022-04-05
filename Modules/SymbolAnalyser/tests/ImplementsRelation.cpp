@@ -8,6 +8,7 @@ TEST(FindImplementsRelation, EmptyFile)
 
     auto IE = getImplementsRelationForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(IE, nullptr);
     ASSERT_EQ(IE->getImplementationMap().size(), 0);
 }
 
@@ -24,6 +25,7 @@ void f() { return; }
 
     auto IE = getImplementsRelationForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(IE, nullptr);
     auto& I = IE->getImplementationMap();
     ASSERT_EQ(I.size(), 1);
     ASSERT_EQ(I.count("/header.h"), 1);
@@ -46,6 +48,7 @@ void f() { return; }
 
     auto IE = getImplementsRelationForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(IE, nullptr);
     auto& I = IE->getImplementationMap();
     ASSERT_EQ(I.size(), 1);
     ASSERT_EQ(I.count("/header.h"), 1);
@@ -71,6 +74,7 @@ void g() { return; }
 
     auto IE = getImplementsRelationForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(IE, nullptr);
     auto& I = IE->getImplementationMap();
     ASSERT_EQ(I.size(), 2);
     ASSERT_EQ(I.count("/header.h"), 1);
@@ -95,6 +99,7 @@ void f() { return; }
 
     auto IE = getImplementsRelationForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(IE, nullptr);
     auto& I = IE->getImplementationMap();
     ASSERT_EQ(I.size(), 1);
     ASSERT_EQ(I.count("/a.h"), 1);
@@ -121,6 +126,7 @@ void X::f() { return; }
 
     auto IE = getImplementsRelationForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(IE, nullptr);
     auto& I = IE->getImplementationMap();
     ASSERT_EQ(I.size(), 1);
     ASSERT_EQ(I.count("/X.h"), 1);

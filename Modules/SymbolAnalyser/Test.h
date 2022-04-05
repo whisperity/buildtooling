@@ -13,6 +13,10 @@
 using namespace SymbolAnalyser;
 
 extern std::vector<std::string> TrivialCompileCommand;
+/**
+ * Includes some additional flags for include paths.
+ */
+extern std::vector<std::string> NontrivialCompileCommand;
 
 /**
  * Helper function that fetches the actual result of rewrites/replacements

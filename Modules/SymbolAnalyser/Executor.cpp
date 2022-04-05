@@ -100,7 +100,7 @@ ToolResult ExecuteTool(const FileMap& FileMap,
         std::string LoadError;
         CompDb = FixedCompilationDatabase::loadFromCommandLine(
             Argc, Argv.data(), LoadError);
-        if (!CompDb)
+        if (!CompDb || !LoadError.empty())
         {
             std::cerr << "Couldn't create in-memory compilation database, "
                          "because:" << std::endl;

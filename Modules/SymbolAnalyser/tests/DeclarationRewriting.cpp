@@ -13,6 +13,7 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -32,6 +33,7 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -51,6 +53,7 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "/foo.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 1);
@@ -78,6 +81,7 @@ namespace
 
     auto FRD = getReplacementsForCompilation(
         map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
     auto R = FRD->getReplacements();
 
     ASSERT_EQ(R.size(), 2);

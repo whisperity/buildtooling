@@ -6,7 +6,10 @@ set(CMAKE_CXX_FLAGS "-W -Wall -Wextra -pedantic \
   -std=c++17")
 
 find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM: ${LLVM_PACKAGE_VERSION}")
+message(STATUS "            at ${LLVM_DIR}")
 find_package(Clang REQUIRED CONFIG)
+message(STATUS "Found Clang at ${Clang_DIR}")
 
 include_directories(SYSTEM
     ${LLVM_INCLUDE_DIRS}
@@ -28,7 +31,10 @@ add_definitions(${LLVM_DEFINITIONS} ${CLANG_DEFINITIONS})
 if(NOT ${LLVM_ENABLE_RTTI})
   # Need to disable RTTI in the client project in case dependency doesn't have
   # it either.
+  message(STATUS "LLVM is without RTTI")
   add_compile_options(-fno-rtti)
+else()
+  message(STATUS "LLVM is with RTTI")
 endif()
 
 add_subdirectory(vendor)
@@ -76,6 +82,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
           tests/ImplementsWriting.cpp
           tests/ImplementsRelation.cpp
           tests/MatchProblematicDeclarations.cpp
+          tests/NontrivialIncludeFlags.cpp
           tests/RenameWriting.cpp
           tests/UsagePoints.cpp)
       target_link_libraries(Test

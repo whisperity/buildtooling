@@ -1,3 +1,4 @@
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -22,11 +23,10 @@ using namespace whisperity;
 
 int main(int argc, const char** argv)
 {
-    if (argc < 2 || argc > 3)
+    if (argc < 2 || argc > 3 || std::strcmp(argv[1], "-h") == 0)
     {
-        std::cerr << "usage: " << argv[0] <<
-                  " <build folder> [thread count]" <<
-                  std::endl;
+        std::cerr << "usage: " << argv[0] << " <build folder> [thread count]"
+                  << std::endl;
         std::cerr << "\t'thread-count' will be 1 by default." << std::endl;
         return 2;
     }
