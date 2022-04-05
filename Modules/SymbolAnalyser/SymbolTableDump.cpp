@@ -10,27 +10,35 @@ namespace SymbolAnalyser
 {
 
 void SymbolTableDump::AddDefinition(std::string Filepath,
-                                    std::size_t Line,
-                                    std::size_t Col,
+                                    std::size_t BeginLine,
+                                    std::size_t BeginCol,
+                                    std::size_t EndLine,
+                                    std::size_t EndCol,
                                     std::string Symbol)
 {
     auto ItP = CollectedDefinitions.try_emplace(
         std::move(Filepath), std::initializer_list<SymbolWithPosition>{});
-    ItP.first->second.emplace_back(SymbolWithPosition{Line,
-                                                      Col,
+    ItP.first->second.emplace_back(SymbolWithPosition{BeginLine,
+                                                      BeginCol,
+                                                      EndLine,
+                                                      EndCol,
                                                       std::move(Symbol)});
 }
 
 void
 SymbolTableDump::AddForwardDeclaration(std::string Filepath,
-                                       std::size_t Line,
-                                       std::size_t Col,
+                                       std::size_t BeginLine,
+                                       std::size_t BeginCol,
+                                       std::size_t EndLine,
+                                       std::size_t EndCol,
                                        std::string Symbol)
 {
     auto ItP = CollectedForwardDeclarations.try_emplace(
         std::move(Filepath), std::initializer_list<SymbolWithPosition>{});
-    ItP.first->second.emplace_back(SymbolWithPosition{Line,
-                                                      Col,
+    ItP.first->second.emplace_back(SymbolWithPosition{BeginLine,
+                                                      BeginCol,
+                                                      EndLine,
+                                                      EndCol,
                                                       std::move(Symbol)});
 }
 
@@ -71,9 +79,10 @@ void writeSymbolDefinitionsOutput(std::ostream& Output,
 {
     for (const auto& S : SymbolTable.getDefinitions(FileToWrite))
         Output << FileToWrite
-               << "##" << S.Line
-               << "##" << S.Col
-               << "##" << S.Symbol << std::endl;
+               << "##" << S.BeginLine << ':' << S.BeginCol
+               << "##" << S.EndLine << ':' << S.EndCol
+               << "##" << S.Symbol
+               << std::endl;
 }
 
 void writeSymbolForwardDeclarationsOutput(std::ostream& Output,
@@ -82,9 +91,10 @@ void writeSymbolForwardDeclarationsOutput(std::ostream& Output,
 {
     for (const auto& S : SymbolTable.getForwardDeclarations(FileToWrite))
         Output << FileToWrite
-               << "##" << S.Line
-               << "##" << S.Col
-               << "##" << S.Symbol << std::endl;
+               << "##" << S.BeginLine << ':' << S.BeginCol
+               << "##" << S.EndLine << ':' << S.EndCol
+               << "##" << S.Symbol
+               << std::endl;
 }
 
 } // namespace SymbolAnalyser

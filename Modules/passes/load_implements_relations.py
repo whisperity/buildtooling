@@ -55,7 +55,7 @@ def main(START_FOLDER, MODULE_MAP, DEPENDENCY_MAP):
         MODULE_MAP.get_modules_for_fragment(implemented),
         None)
       utils.logging.normal(
-        "Symbols of file '%s' in module %s (%s) is implemented by:"
+        "Symbols of file '%s' in module '%s' (%s) is implemented by:"
         % (implemented,
            module_of_implemented,
            MODULE_MAP.get_filename(module_of_implemented)),

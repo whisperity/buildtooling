@@ -8,30 +8,32 @@
 namespace SymbolAnalyser
 {
 
-/**
- *
- */
-
 class SymbolTableDump
 {
 
 public:
     struct SymbolWithPosition
     {
-        std::size_t Line;
-        std::size_t Col;
+        std::size_t BeginLine;
+        std::size_t BeginCol;
+        std::size_t EndLine;
+        std::size_t EndCol;
         std::string Symbol;
     };
 
     typedef std::vector<SymbolWithPosition> SymbolVector;
 
     void AddDefinition(std::string Filepath,
-                       std::size_t Line,
-                       std::size_t Col,
+                       std::size_t BeginLine,
+                       std::size_t BeginCol,
+                       std::size_t EndLine,
+                       std::size_t EndCol,
                        std::string Symbol);
     void AddForwardDeclaration(std::string Filepath,
-                       std::size_t Line,
-                       std::size_t Col,
+                       std::size_t BeginLine,
+                       std::size_t BeginCol,
+                       std::size_t EndLine,
+                       std::size_t EndCol,
                        std::string Symbol);
 
     const std::set<std::string> getKnownFiles() const;

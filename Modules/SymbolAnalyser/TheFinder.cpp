@@ -382,11 +382,12 @@ private:
             return;
 
         const SourceManager& SM = ND->getASTContext().getSourceManager();
-        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
-        const std::string& Filename = SM.getFilename(SLoc).str();
-        if (SLoc.isInvalid())
+        const SourceLocation& SLocB = SM.getSpellingLoc(ND->getBeginLoc());
+        const SourceLocation& SLocE = SM.getSpellingLoc(ND->getEndLoc());
+        const std::string& Filename = SM.getFilename(SLocB).str();
+        if (SLocB.isInvalid() || SLocE.isInvalid())
             return;
-        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+        if (SM.isInSystemHeader(SLocB) || SM.isInSystemMacro(SLocB))
             // System headers should stay where they are...
             return;
         if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
@@ -395,19 +396,22 @@ private:
 
         SymbolTableDumper.AddDefinition(
             Filename,
-            SM.getSpellingLineNumber(SLoc),
-            SM.getSpellingColumnNumber(SLoc),
+            SM.getSpellingLineNumber(SLocB),
+            SM.getSpellingColumnNumber(SLocB),
+            SM.getSpellingLineNumber(SLocE),
+            SM.getSpellingColumnNumber(SLocE),
             ND->getQualifiedNameAsString());
     }
 
     void HandleForwardDeclaration(const NamedDecl* ND)
     {
         const SourceManager& SM = ND->getASTContext().getSourceManager();
-        const SourceLocation& SLoc = SM.getSpellingLoc(ND->getBeginLoc());
-        const std::string& Filename = SM.getFilename(SLoc).str();
-        if (SLoc.isInvalid())
+        const SourceLocation& SLocB = SM.getSpellingLoc(ND->getBeginLoc());
+        const SourceLocation& SLocE = SM.getSpellingLoc(ND->getEndLoc());
+        const std::string& Filename = SM.getFilename(SLocB).str();
+        if (SLocB.isInvalid() || SLocE.isInvalid())
             return;
-        if (SM.isInSystemHeader(SLoc) || SM.isInSystemMacro(SLoc))
+        if (SM.isInSystemHeader(SLocB) || SM.isInSystemMacro(SLocB))
             // System headers should stay where they are...
             return;
         if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
@@ -420,7 +424,7 @@ private:
                 const SourceLocation& DefLoc = SM.getSpellingLoc(
                     FunDef->getBeginLoc());
                 if (DefLoc.isValid() && SM.isInMainFile(DefLoc) &&
-                    SM.isInMainFile(SLoc))
+                    SM.isInMainFile(SLocB))
                 {
                     // If the function is forward declared *and* defined in the
                     // same file, then it is most likely just a coding
@@ -432,8 +436,10 @@ private:
 
         SymbolTableDumper.AddForwardDeclaration(
             Filename,
-            SM.getSpellingLineNumber(SLoc),
-            SM.getSpellingColumnNumber(SLoc),
+            SM.getSpellingLineNumber(SLocB),
+            SM.getSpellingColumnNumber(SLocB),
+            SM.getSpellingLineNumber(SLocE),
+            SM.getSpellingColumnNumber(SLocE),
             ND->getQualifiedNameAsString());
     }
 
