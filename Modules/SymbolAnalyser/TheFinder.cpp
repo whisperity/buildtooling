@@ -213,6 +213,11 @@ private:
 
         while (true)
         {
+            // Try different kinds of type location usages.
+            if (HandleDeclForTypeLoc<TypedefNameDecl>(
+                    Type->getAsAdjusted<TypedefType>(), SM, SLoc))
+                return;
+
             if (const auto *DesugaredType = Type->getUnqualifiedDesugaredType();
                 Type != DesugaredType)
             {
@@ -229,11 +234,6 @@ private:
                 Type = RefType->getPointeeType().getTypePtr();
                 continue;
             }
-
-            // Try different kinds of type location usages.
-            if (HandleDeclForTypeLoc<TypedefNameDecl>(
-                    Type->getAsAdjusted<TypedefType>(), SM, SLoc))
-                return;
 
             if (HandleDeclForTypeLoc<RecordDecl>(
                     Type->getAsAdjusted<RecordType>(), SM, SLoc))
