@@ -106,26 +106,53 @@ public:
                          "`NamedDecl`?");
         }
 
-        if (!ND->getDeclName().isIdentifier() || ND->getName().str().empty())
+        HandleDefinition(ND);
+    }
+
+    void HandleDefinition(const NamedDecl* ND)
+    {
+        assert(ND && "Nullptr!");
+
+        std::string DeclName;
+        if (ND->getDeclName().isIdentifier())
+            DeclName = ND->getName().str();
+        else if (const auto* Ctor = dyn_cast<CXXConstructorDecl>(ND))
+            DeclName = Ctor->getParent()->getName().str();
+        else if (const auto* Dtor = dyn_cast<CXXDestructorDecl>(ND))
+            DeclName = Dtor->getParent()->getName().str();
+
+        if (DeclName.empty())
             // If the declaration hasn't a name, it cannot be renamed.
             return;
 
-        const std::string& DeclName = ND->getName().str();
-        const SourceLocation& Loc = Result.SourceManager->getSpellingLoc(
-            ND->getLocation());
-        const std::string &Filename =
-            Result.SourceManager->getFilename(Loc).str();
-        Replacements.SetReplacementBinding(ND->getName().str(), ND);
+        const SourceManager& SM = ND->getASTContext().getSourceManager();
+        const SourceLocation& Loc = SM.getSpellingLoc(ND->getLocation());
+        const std::string& Filename = SM.getFilename(Loc).str();
+        Replacements.SetReplacementBinding(DeclName, ND);
         if (Loc.isInvalid())
             return;
         if (Replacements.getFilepath() != Filename)
             return;
 
+        auto Col = SM.getSpellingColumnNumber(Loc);
+        if (isa<CXXDestructorDecl>(ND))
+            // Offset the location for the destructor's token because it is
+            // always "~Foo()", but Loc points to the starting ~ originally.
+            ++Col;
+
         Replacements.AddReplacementPosition(
-            Result.SourceManager->getSpellingLineNumber(Loc),
-            Result.SourceManager->getSpellingColumnNumber(Loc),
+            SM.getSpellingLineNumber(Loc),
+            Col,
             DeclName,
             ND);
+
+        if (const auto *CRD = dyn_cast<CXXRecordDecl>(ND))
+        {
+            for (const CXXConstructorDecl *Ctor : CRD->ctors())
+                HandleDefinition(Ctor);
+            if (const CXXDestructorDecl *Dtor = CRD->getDestructor())
+                HandleDefinition(Dtor);
+        }
     }
 
 private:
@@ -183,14 +210,37 @@ private:
             return;
 
         const Type* Type = Loc->getTypePtr();
-        // Try different kinds of type location usages.
-        if (HandleDeclForTypeLoc<TypedefNameDecl>(
-            Type->getAsAdjusted<TypedefType>(), SM, SLoc))
-            return;
 
-        if (HandleDeclForTypeLoc<RecordDecl>(
-            Type->getAsAdjusted<RecordType>(), SM, SLoc))
-            return;
+        while (true)
+        {
+            if (const auto *DesugaredType = Type->getUnqualifiedDesugaredType();
+                Type != DesugaredType)
+            {
+                Type = DesugaredType;
+                continue;
+            }
+            if (const auto* PtrType = Type->getAs<ReferenceType>())
+            {
+                Type = PtrType->getPointeeType().getTypePtr();
+                continue;
+            }
+            if (const auto* RefType = Type->getAs<ReferenceType>())
+            {
+                Type = RefType->getPointeeType().getTypePtr();
+                continue;
+            }
+
+            // Try different kinds of type location usages.
+            if (HandleDeclForTypeLoc<TypedefNameDecl>(
+                    Type->getAsAdjusted<TypedefType>(), SM, SLoc))
+                return;
+
+            if (HandleDeclForTypeLoc<RecordDecl>(
+                    Type->getAsAdjusted<RecordType>(), SM, SLoc))
+                return;
+
+            break;
+        }
 
         // It's not directly a problem if a TypeLoc was matched that does not
         // refer to any of the above cases.
