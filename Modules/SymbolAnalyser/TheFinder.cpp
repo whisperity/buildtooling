@@ -112,6 +112,19 @@ public:
     void HandleDefinition(const NamedDecl* ND)
     {
         assert(ND && "Nullptr!");
+        if (ND->isImplicit())
+            // Implicit nodes do not have meaningful locations in the AST,
+            // so we do not rewrite them.
+            return;
+
+        if (isa<CXXMethodDecl>(ND) &&
+            !isa<CXXConstructorDecl, CXXDestructorDecl>(ND))
+            // Member methods that are not the Ctor or Dtor must not be renamed,
+            // as their names are namespaced by the enclosing record's.
+            // Rewriting would cause "Class:method()" to become
+            // "MyTU_Class::MyTU_method()" which is nonsense, as the declaration
+            // within the class itself will not be renamed, only the class.
+            return;
 
         std::string DeclName;
         if (ND->getDeclName().isIdentifier())

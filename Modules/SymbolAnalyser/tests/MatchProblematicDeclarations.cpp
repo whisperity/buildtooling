@@ -1027,3 +1027,48 @@ int main()
     EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 20, 15)); // ::~MyClass
     EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 25, 12)); // MyClass{42}
 }
+
+TEST(MatchProblematicDeclarations, AnonymousClassMemberOutsideAnonymousNS)
+{
+    FileMap map = {
+        {"/main.cpp", R"FILE(
+namespace
+{
+    class MyClass
+    {
+    private:
+        int M;
+    public:
+        MyClass(int I);
+
+        int foo() const;
+    };
+}
+
+MyClass::MyClass(int I) : M(I) {}
+
+int MyClass::foo() const { return M; }
+
+int main()
+{
+    return MyClass{42}.foo();
+}
+)FILE"}
+    };
+
+    auto FRD = getReplacementsForCompilation(
+        map, "/main.cpp", TrivialCompileCommand);
+    ASSERT_NE(FRD, nullptr);
+    auto R = FRD->getReplacements();
+
+    EXPECT_EQ(R.size(), 6);
+    EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 4, 11));  // class MyClass
+    EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 9, 9));   // MyClass(int)
+    EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 15, 1));  // MyClass::
+    EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 15, 10)); // MyClass(int)
+    EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 17, 5));  // MyClass::foo()
+    EXPECT_TRUE(nameMatchedAtPosition(R, "MyClass", 21, 12)); // MyClass{42}
+
+    EXPECT_FALSE(nameMatchedAtPosition(R, "MyClass", 17, 14)); // ::foo()
+    EXPECT_FALSE(nameMatchedAtPosition(R, "MyClass", 21, 24)); // .foo()
+}
