@@ -92,6 +92,7 @@ def _recurse_includes(start_folder,
 def main(START_FOLDER,
          MODULE_MAP,
          DEPENDENCY_MAP,
+         INCLUDE_PATHS,
          FILTER_FILE_REGEX,
          REMOVE_LINES_FROM_FILES,
          EXTERNAL_INCLUDE_GRAPH):
@@ -115,7 +116,8 @@ def main(START_FOLDER,
       include.filter_imports_from_includes(file,
                                            content,
                                            MODULE_MAP,
-                                           DEPENDENCY_MAP)
+                                           DEPENDENCY_MAP,
+                                           INCLUDE_PATHS)
 
     if not lines_to_remove_from_file:
       continue

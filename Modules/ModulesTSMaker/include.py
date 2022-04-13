@@ -38,7 +38,8 @@ def get_included_files(text):
 def filter_imports_from_includes(filename,
                                  text,
                                  modulemap,
-                                 dependency_map):
+                                 dependency_map,
+                                 include_paths):
   """
   Using the given :param modulemap:, filter the :param text: into a source
   code which does not contain '#include' statements to files that are mapped
@@ -48,9 +49,13 @@ def filter_imports_from_includes(filename,
   specifies that what files belonging to a module depend on what files
   belonging to other modules.
 
+  :param include_paths: Additional include paths discovered from the project.
+
   :returns: The line numbers and line contents of lines that should be removed,
   and the list of include directives (and line numbers) that should be kept.
   """
+  if not include_paths:
+      include_paths = []
 
   # Get the "first" module from the module map read earlier which contains
   # the included file as its own include (so the included file's code is
@@ -85,9 +90,13 @@ def filter_imports_from_includes(filename,
       # If no module is found for the include, it might have been an include
       # from the local folder. Let's try that way first...
       original_included = included
-      included = os.path.join(os.path.dirname(filename), included)
-      # TODO: Try handling include paths here?
-      module = __get_module(included)
+      try_include_dirs = [os.path.dirname(filename)] + include_paths
+      for include_dir in try_include_dirs:
+        included = os.path.join(include_dir, original_included)
+        module = __get_module(included)
+        if module:
+          break
+
       if not module:
         logging.normal("%s: Include file '%s' not found in module mapping."
                        % (filename, original_included),

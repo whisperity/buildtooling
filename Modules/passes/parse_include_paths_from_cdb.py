@@ -1,5 +1,6 @@
 import codecs
 import json
+import os
 import shlex
 
 from utils import logging
@@ -26,6 +27,16 @@ def main(COMPILE_COMMANDS_JSON):
   """
   include_search_paths = list()
   include_search_set = set()
+
+  def _add_include_path(path):
+    if path in include_search_set:
+      return
+
+    logging.verbose("Will also use '%s' as include search directory..." % path)
+    include_search_set.add(path)
+    include_search_paths.append(path)
+
+    _add_include_path(os.path.relpath(path))
 
   logging.normal("Loading compilation database '%s'..."
                  % COMPILE_COMMANDS_JSON)
@@ -57,10 +68,10 @@ def main(COMPILE_COMMANDS_JSON):
           # real include path value is the next argument.
           arg = args[i + 1]
 
-        if arg not in include_search_set:
-          logging.verbose("Will also use '%s' as include search directory..."
-                          % arg)
-          include_search_set.add(arg)
-          include_search_paths.append(arg)
+        _add_include_path(arg)
+
+  logging.verbose("Additional include paths:")
+  for ip in include_search_paths:
+      logging.verbose("    - %s" % (ip))
 
   return include_search_paths
