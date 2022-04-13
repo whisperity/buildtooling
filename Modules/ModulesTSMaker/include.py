@@ -86,6 +86,7 @@ def filter_imports_from_includes(filename,
       # from the local folder. Let's try that way first...
       original_included = included
       included = os.path.join(os.path.dirname(filename), included)
+      # TODO: Try handling include paths here?
       module = __get_module(included)
       if not module:
         logging.normal("%s: Include file '%s' not found in module mapping."

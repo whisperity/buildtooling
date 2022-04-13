@@ -139,8 +139,6 @@ CONFIGS.add_argument(
        "IMPLEMENTATION files of the project. By default matches cc, cpp/ipp "
        "and their xx/++ variants.")
 
-# TODO: Support specifying -I directives either here, or load them from CDB.
-
 LOGGING = PARSER.add_argument_group('output verbosity arguments')
 
 LOGGING.add_argument('--hide-compiler',
@@ -211,6 +209,9 @@ START_AT = time.time()
 # has to be touched.
 PassLoader.register_global('ALWAYS_DO_ANALYSIS', ARGS.force_reanalysis)
 PassLoader.execute_pass('execute_symbol_analyser')
+
+INCLUDE_PATHS = PassLoader.execute_pass('parse_include_paths_from_cdb')
+PassLoader.register_global('INCLUDE_PATHS', INCLUDE_PATHS)
 
 # Load the necessary knowledge about the project.
 MODULE_MAP, DEPENDENCY_MAP = \
