@@ -29,14 +29,13 @@ def main(COMPILE_COMMANDS_JSON):
   include_search_set = set()
 
   def _add_include_path(path):
+    path = os.path.relpath(path)
     if path in include_search_set:
       return
 
     logging.verbose("Will also use '%s' as include search directory..." % path)
     include_search_set.add(path)
     include_search_paths.append(path)
-
-    _add_include_path(os.path.relpath(path))
 
   logging.normal("Loading compilation database '%s'..."
                  % COMPILE_COMMANDS_JSON)

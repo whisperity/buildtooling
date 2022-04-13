@@ -645,36 +645,51 @@ def write_topological_order(module_file,
   in order of an (u, v) edge specifying that file u depends on file v.
   """
 
-  try:
-    # Topological sort requires that dependencies are expressed in a (u, v)
-    # edge which means u depends on v. The edges created from
-    # :param intramodule_dependencies: contains the dependencies reversed, as
-    # u's dependency vs are listed, which would mean that the dependee is to
-    # appear (in topological order) before the dependency. Flipping the edges
-    # is required because of this.
-    graph = nx.DiGraph(intramodule_dependencies).reverse(True)
+  # Topological sort requires that dependencies are expressed in a (u, v)
+  # edge which means u depends on v. The edges created from
+  # :param intramodule_dependencies: contains the dependencies reversed, as
+  # u's dependency vs are listed, which would mean that the dependee is to
+  # appear (in topological order) before the dependency. Flipping the edges
+  # is required because of this.
+  graph = nx.DiGraph(intramodule_dependencies).reverse(True)
 
-    # Add the external dependency edges between files of the current module
-    # only, and of course keep the "external" files.
-    extern_sub_graph = external_include_graph.copy()
-    external_attribute = nx.get_node_attributes(extern_sub_graph, 'external')
-    extern_sub_graph.remove_nodes_from([
-      v for v in extern_sub_graph
-      if external_attribute[v] is False and v not in graph.nodes])
-    clean_cycles_from_external_graph(extern_sub_graph)
+  # Add the external dependency edges between files of the current module
+  # only, and of course keep the "external" files.
+  extern_sub_graph = external_include_graph.copy()
+  external_attribute = nx.get_node_attributes(extern_sub_graph, 'external')
+  extern_sub_graph.remove_nodes_from([
+    v for v in extern_sub_graph
+    if external_attribute[v] is False and v not in graph.nodes])
+  clean_cycles_from_external_graph(extern_sub_graph)
 
-    # Reverse the edges for the exact same reason as above.
-    graph.update(extern_sub_graph.reverse(False))
+  # Reverse the edges for the exact same reason as above.
+  graph.update(extern_sub_graph.reverse(False))
 
-    topological = list(nx.topological_sort(graph))  # Force generation for exc.
-  except nx.NetworkXUnfeasible as e:
-    logging.essential("Error! Circular dependency found in header files used "
-                      "in module %s. Module file cannot be rewritten!"
+  # If the module's inner files contain cyclic includes of each other, the
+  # header guards must stay because there is no good deterministic order of
+  # code that would satisfy the dependency (at least without actually
+  # observing symbol-to-symbol dependencies within the file, which we do not
+  # do...) directives.
+  files_in_cycles = set()
+  cycles = list(nx.simple_cycles(graph))
+  if cycles:
+    logging.essential("Warning! Circular dependency found in header files "
+                      "used in module %s. Module file cannot be rewritten "
+                      "to lack header guards!"
                       % module_file,
                       file=sys.stderr)
-    logging.essential(e, file=sys.stderr)
 
-    return False
+    logging.normal("The following cycles were detected:", file=sys.stderr)
+    for cycle in cycles:
+        logging.normal("\t%s -> %s" % (" -> ".join(cycle), cycle[0]),
+                       file=sys.stderr)
+        files_in_cycles.update(cycle)
+
+  for file in files_in_cycles:
+    graph.remove_node(file)
+
+  topological = list(nx.topological_sort(graph))  # Force generation for exc.
+  topological.extend(files_in_cycles)
 
   with codecs.open(module_file, 'r+',
                    encoding='utf-8', errors='replace') as f:

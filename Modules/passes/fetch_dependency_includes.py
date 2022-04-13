@@ -43,7 +43,6 @@ def _recurse_includes(start_folder,
     file = os.path.join(start_folder, file)
   if not os.path.isfile(file):
     return False
-  # TODO: Handle include paths here.
   if file in include_graph:
     # Don't load the contents of a file multiple times.
     return file

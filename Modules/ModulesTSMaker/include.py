@@ -95,6 +95,9 @@ def filter_imports_from_includes(filename,
         included = os.path.join(include_dir, original_included)
         module = __get_module(included)
         if module:
+          logging.verbose("%s: Include '%s' resolved as '%s'"
+                         % (filename, original_included, included),
+                         file=sys.stderr)
           break
 
       if not module:
