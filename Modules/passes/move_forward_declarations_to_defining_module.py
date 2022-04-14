@@ -69,14 +69,15 @@ def main(MODULE_MAP,
                         file=sys.stderr)
         continue
       if len(modules_of_definition) > 1:
-        logging.essential("ERROR: Symbol '%s' forward declared in file %s is "
-                          "defined in multiple modules: %s (by files %s). The "
-                          "forward declaration cannot be used as a link of "
-                          "module merging."
+        logging.essential("ERROR: Symbol '%s' forward declared in file '%s' "
+                          "is defined in multiple modules: %s (by files %s). "
+                          "The forward declaration cannot be used as a link "
+                          "for module merging."
                           % (symbol, file,
                              ', '.join(modules_of_definition),
                              ', '.join(DEFINITIONS[symbol])),
                           file=sys.stderr)
+        continue
         sys.exit(1)
       modules_of_definition = list(modules_of_definition)
 

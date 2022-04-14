@@ -20,7 +20,6 @@ FileReplaceDirectives::FileReplaceDirectives(std::string Filepath,
     }
 
     // Fix some more bogus characters that create invalid identifiers.
-    auto It = RewritePrefix.begin();
     const auto End = RewritePrefix.end();
     for (auto It = RewritePrefix.begin(); It != End; ++It)
     {
