@@ -643,6 +643,10 @@ def write_topological_order(module_file,
 
   :param external_include_graph: This graph contains file->file dependencies
   in order of an (u, v) edge specifying that file u depends on file v.
+
+  :return: True if a topological sort was successfully created, otherwise the
+  list of files for which "header guards" must remain because they could not
+  have been topo-sorted correctly.
   """
 
   # Topological sort requires that dependencies are expressed in a (u, v)
@@ -737,7 +741,7 @@ def write_topological_order(module_file,
     f.writelines(lines)
     f.truncate(f.tell())
 
-  return True
+  return True if not files_in_cycles else list(files_in_cycles)
 
 
 def get_dependency_map_implementation_insanity(dependency_map):

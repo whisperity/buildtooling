@@ -251,8 +251,9 @@ PassLoader.execute_pass('move_forward_declarations_to_defining_module')
 if not ARGS.dry_run:
   # Save the algorithm's output.
   PassLoader.execute_pass('rename_conflicting_symbols')
+  NON_TOPOLOGICAL_FILES = PassLoader.execute_pass('write_module_files')
+  PassLoader.register_global('NON_TOPOLOGICAL_FILES', NON_TOPOLOGICAL_FILES)
   PassLoader.execute_pass('remove_lines_from_source')
-  PassLoader.execute_pass('write_module_files')
   PassLoader.execute_pass('emit_cmake_module_directives')
 else:
   utils.logging.normal("\n\n'--dry-run' was specified: not writing output.")

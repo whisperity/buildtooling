@@ -29,6 +29,7 @@ def main(START_FOLDER,
   # module "fragments" (which are rewritten by this script) must be in
   # a good order.
   topological_success = True
+  non_topological_files = list()
   for module in tqdm(sorted(MODULE_MAP),
                      desc="Sorting files",
                      unit='module'):
@@ -54,15 +55,21 @@ def main(START_FOLDER,
         # uses-dependency relation.
         intramodule_dependencies[dependee_file] = dep_list
 
-    module_success = mapping.write_topological_order(
+    module_success_or_non_topo_files = mapping.write_topological_order(
       MODULE_MAP.get_filename(module),
       HEADER_FILE_REGEX,
       EXTERNAL_INCLUDE_GRAPH,
       intramodule_dependencies)
-    topological_success = topological_success and module_success
+    if type(module_success_or_non_topo_files) is list:
+        non_topological_files.extend(module_success_or_non_topo_files)
+        module_success_or_non_topo_files = True
+    topological_success = topological_success and \
+        module_success_or_non_topo_files
 
   if not topological_success:
     logging.essential("Error: one of more module files' interface (header) "
                       "part could not have been sorted properly.",
                       file=sys.stderr)
     sys.exit(1)
+
+  return non_topological_files

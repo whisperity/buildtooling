@@ -8,10 +8,16 @@ from utils.progress_bar import tqdm
 DESCRIPTION = "Remove unnecessary lines from source files"
 
 
-def main(REMOVE_LINES_FROM_FILES):
+def main(REMOVE_LINES_FROM_FILES, NON_TOPOLOGICAL_FILES):
   for file, remove_list in tqdm(sorted(REMOVE_LINES_FROM_FILES.items()),
                                 desc="Removing obsolete source text",
                                 unit='file'):
+    if file in NON_TOPOLOGICAL_FILES:
+        logging.normal("%s: File marked as non-topological, not touching..."
+                       % (file),
+                       file=sys.stderr)
+        continue
+
     try:
       with codecs.open(file, 'r', encoding='utf-8', errors='replace') as f:
         content = f.read()
