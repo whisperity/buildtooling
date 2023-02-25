@@ -141,7 +141,7 @@ CONFIGS.add_argument(
 
 CONFIGS.add_argument("--module-split-pingpong-threshold",
                      type=int,
-                     default=4,
+                     default=8,
                      metavar="ITERATIONS",
                      help="The size of the sliding window of cycles in the "
                           "'split circular module interfaces' step are "

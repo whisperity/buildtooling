@@ -141,6 +141,7 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   files_to_move = dict(map(lambda e:
                            (e[1].replace('-> ', '').replace(' ->', ''), None),
                            cutting_edges))
+  original_files_to_move = sorted(list(files_to_move.keys()))
 
   # However, it could be that a file on the end of the cutting edge is also a
   # file from which dependencies are made. This can cause that a file
@@ -254,10 +255,19 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
   for file in files_moving_without_new_module_name:
     files_to_move[file] = new_module_name
 
-  logging.verbose("Will move the following files to fix the cycle:")
-  if logging.get_configuration()["verbose"]:
-    for file, module in files_to_move.items():
-      logging.verbose("    %s -> %s" % (file, module))
+  if files_to_move:
+    logging.verbose("Will move the following files to fix the cycle:")
+    if logging.get_configuration()["verbose"]:
+      for file, module in files_to_move.items():
+        logging.verbose("    %s -> %s" % (file, module))
+  else:
+    if original_files_to_move:
+      logging.normal("Run out of candidates. None of the following "
+                     "were movable:\n%s"
+                     % ("    %s".join(original_files_to_move)),
+                     file=sys.stderr)
+    else:
+      logging.normal("There were no canditates for moving.", file=sys.stderr)
 
   return files_to_move
 
@@ -340,6 +350,8 @@ def _parallel(cycle, module_map, dependency_map):
   if not files_to_move:
     # If files_to_move is a falsy value, like empty set, the cycle is
     # deemed infeasible to solve.
+    logging.normal("Circular dependency between modules infeasible to split:"
+                   "\n    %s" % ' -> '.join(cycle))
     return False
   else:
     # Return the list of files to be cut for merging to the pool handler.
@@ -379,8 +391,6 @@ def get_circular_dependency_resolution(iteration_pingpong_buffer,
             # so the order is deterministic.
             sorted(module_map.get_dependencies_of_module(module)))
 
-  logging.normal("... Searching for cycles between %d modules ..."
-                 % len(module_map))
   dependencies = dict(map(_map_to_dependencies, module_map))
   shortest_cycle_length, minimum_long_cycles = graph.simple_cycles(
       dependencies)
@@ -433,14 +443,16 @@ def get_circular_dependency_resolution(iteration_pingpong_buffer,
           iteration_pingpong_check[1] > iteration_pingpong_threshold:
         # Found the same cycle twice in the lookbehind buffer - consider the
         # algorithm looping...
+        cycle, count = iteration_pingpong_check
+        cycle = cycle.replace(',', " -> ")
         logging.essential("Error! The same cycle appeared %d times amongst "
                           "the last %d handled cycles.\nConsidering the "
-                          "algorithm to have stuck in a loop!\n%s"
-                          % (iteration_pingpong_check[1],
-                             len(iteration_pingpong_buffer),
-                             iteration_pingpong_check[0]), file=sys.stderr)
+                          "algorithm to have stuck in a loop!\n    %s"
+                          % (count, len(iteration_pingpong_buffer), cycle),
+                          file=sys.stderr)
         logging.essential("The offending file moves in the current step, "
-                          "likely continuing the cycle were: ")
+                          "likely contributing to keeping the cycle alive "
+                          "were: ")
         for file, module in ret.items():
           logging.essential("    %s -> %s" % (file, module))
 
@@ -455,7 +467,7 @@ def main(MODULE_MAP, DEPENDENCY_MAP,
   # as this stage operates based on them.
   DEPENDENCY_MAP.synthesize_intermodule_imports()
 
-  pingpong_buffer = deque([], MODULE_SPLIT_PINGPONG_THRESHOLD ** 2)
+  pingpong_buffer = deque([], MODULE_SPLIT_PINGPONG_THRESHOLD ** 3)
 
   # Check if the read module map contains circular dependencies that make the
   # current module map infeasible, and try to resolve it.
@@ -469,6 +481,9 @@ def main(MODULE_MAP, DEPENDENCY_MAP,
       logging.essential(
         "========->> Begin iteration %d trying to break cycles.. <<-========"
         % iteration_count)
+      module_count = len(MODULE_MAP)
+      logging.normal("... Searching for cycles between %d modules ..."
+                     % module_count)
 
       files_to_move = get_circular_dependency_resolution(
         pingpong_buffer, MODULE_SPLIT_PINGPONG_THRESHOLD,
@@ -488,6 +503,12 @@ def main(MODULE_MAP, DEPENDENCY_MAP,
         # Alter the module map with the calculated moves, and try running the
         # iteration again.
         mapping.apply_file_moves(MODULE_MAP, DEPENDENCY_MAP, files_to_move)
+
+      if len(MODULE_MAP) != module_count:
+        # The number of modules have changed, so the iteration must have
+        # progressed. Wipe the infinite pingpong loop buffer in this case, so
+        # actual forward progress is not considered an infinite cycle.
+        pingpong_buffer.clear()
 
       iteration_count += 1
 
