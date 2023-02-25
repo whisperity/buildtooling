@@ -104,7 +104,7 @@ if excess:
         to_bucket_idx = RANDOM.choice(allowed_buckets)
         buckets[to_bucket_idx].append(m)
         print("Assigned module '%s' to bucket #%d" % (m, to_bucket_idx + 1))
-        if len(buckets[to_bucket_idx]) >= max_element_count:
+        if len(buckets[to_bucket_idx]) > max_element_count:
             print("Bucket #%d is now full, may no longer receive excess..."
                   % (to_bucket_idx + 1))
             allowed_buckets.remove(to_bucket_idx)

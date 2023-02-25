@@ -20,7 +20,9 @@ do
   do
     rm -f ./RandomModule_*.cppm
     git reset --hard
-    random-cppms.py . "${i}" 2>&1 | tee "./random-experiment-results/${i}_${n}-$(date | tr ' ' '-').log"
-    __main__.py "$CCDB" "$OUTMOD" --jobs "$(nproc)" --profile --dry-run 2>&1 | tee --append "./random-experiment-results/${i}_${n}-$(date | tr ' ' '-').log"
+
+    OUT_FILE="./random-experiment-results/${i}_${n}-$(date | tr ' ' '-').log"
+    random-cppms.py . "${i}" 2>&1 | tee "${OUT_FILE}"
+    __main__.py "$CCDB" "$OUTMOD" --jobs "$(nproc)" --profile --dry-run 2>&1 | tee --append "${OUT_FILE}"
   done
 done
