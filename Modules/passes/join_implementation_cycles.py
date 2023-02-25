@@ -10,7 +10,7 @@ except ImportError as e:
   raise
 
 from ModulesTSMaker import mapping
-from utils import logging
+from utils import graph, logging
 from utils.graph_visualisation import get_visualizer as graph_visualisation
 
 
@@ -36,42 +36,10 @@ def _fold_cycles(module_map, dependency_map):
             sorted(module_map.get_dependencies_of_module(module)))
 
   dependencies = dict(map(_map_to_dependencies, module_map))
-  graph = nx.DiGraph(dependencies)
-
-  # Generating the simple_cycles() of the dependency graph is very very costly
-  # at this point, as for ~60 modules they could be the order of or above
-  # 10 billion. Instead, this quadratic algorithm of the adjacency matrix will
-  # try selecting shortest cycles.
-  dependency_paths = dict()
-  for n in sorted(dependencies):
-    for m in sorted(dependencies):
-      if n == m:
-        continue
-
-      try:
-        forward_path = next(nx.shortest_simple_paths(graph, n, m))
-        backward_path = next(nx.shortest_simple_paths(graph, m, n))
-      except nx.NetworkXNoPath:
-        # Disregard the exception if a module cannot be reached from another
-        # one.
-        continue
-
-      # Cut the repeated middle element.
-      cycle = forward_path + backward_path[1:]
-      if n not in dependency_paths or len(cycle) < len(dependency_paths[n]):
-        dependency_paths[n] = cycle
-
-  if not dependency_paths:
-    # If there are no more cycles, quit.
-    return True
-
-  cycle_lengths = sorted(
-    map(lambda e: (e[0], len(e[1])), dependency_paths.items()),
-    key=itemgetter(1))
-  cycle_lengths_minimum = min(cycle_lengths, key=itemgetter(1))[1]
-  minimum_long_cycles = sorted(filter(
-    lambda e: len(e[1]) == cycle_lengths_minimum,
-    dependency_paths.items()))
+  cycle_lengths_minimum, minimum_long_cycles = graph.simple_cycles(
+      dependencies)
+  if not minimum_long_cycles:
+      return True
 
   logging.normal("Found %d shortest cycles with the length of %d, trying to "
                  "merge..." % (len(minimum_long_cycles),

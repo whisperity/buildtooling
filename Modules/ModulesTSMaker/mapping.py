@@ -262,7 +262,7 @@ class DependencyMap():
               # Remove the file from every file's dependency list, if found.
               dep_filedict[kind].remove(filename)
 
-          if all(not l for l in dep_filedict.values()):
+          if all(not line for line in dep_filedict.values()):
             # The dependency list of module 'dep_module' for
             # 'file_in_module' has emptied out, remove this entry.
             inner_modules_to_remove.append(dep_module)

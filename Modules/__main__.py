@@ -139,6 +139,16 @@ CONFIGS.add_argument(
        "IMPLEMENTATION files of the project. By default matches cc, cpp/ipp "
        "and their xx/++ variants.")
 
+CONFIGS.add_argument("--module-split-pingpong-threshold",
+                     type=int,
+                     default=4,
+                     metavar="ITERATIONS",
+                     help="The size of the sliding window of cycles in the "
+                          "'split circular module interfaces' step are "
+                          "temporarily collected. If in at most this many "
+                          "iterations the same cycle is \"rediscovered\" "
+                          "then the algorithm is terminated with an error.")
+
 LOGGING = PARSER.add_argument_group('output verbosity arguments')
 
 LOGGING.add_argument('--hide-compiler',
@@ -236,6 +246,8 @@ PassLoader.execute_pass('fetch_dependency_includes')
 PassLoader.register_global('FILTER_FILE_REGEX', None)
 
 # Execute the passes of the algorithm and try to solve modularisation.
+PassLoader.register_global('MODULE_SPLIT_PINGPONG_THRESHOLD',
+                           ARGS.module_split_pingpong_threshold)
 PassLoader.execute_pass('solve_potential_module_import_cycles')
 PassLoader.execute_pass('move_implementation_files_to_new_modules')
 
@@ -287,5 +299,5 @@ elif ARGS.profile:
   print("\nExecution ended at %s."
         % datetime.datetime.fromtimestamp(END_AT)
         .strftime(r'%Y-%m-%d %H:%M:%S.%f'))
-  print("Total execution took %s"
+  print("Total execution took %s wall time."
         % datetime.timedelta(seconds=END_AT - START_AT))

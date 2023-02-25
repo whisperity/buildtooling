@@ -1,7 +1,8 @@
 import itertools
 import multiprocessing
+import operator
 import sys
-from collections import deque
+from collections import Counter, deque
 
 try:
   import networkx as nx
@@ -254,7 +255,9 @@ def _files_from_cutting_edges(module_map, flow_graph, cutting_edges):
     files_to_move[file] = new_module_name
 
   logging.verbose("Will move the following files to fix the cycle:")
-  logging.verbose("    %s" % '\n    '.join(sorted(files_to_move)))
+  if logging.get_configuration()["verbose"]:
+    for file, module in files_to_move.items():
+      logging.verbose("    %s -> %s" % (file, module))
 
   return files_to_move
 
@@ -343,11 +346,20 @@ def _parallel(cycle, module_map, dependency_map):
     return files_to_move
 
 
-def get_circular_dependency_resolution(pool, module_map, dependency_map):
+def get_circular_dependency_resolution(iteration_pingpong_buffer,
+                                       iteration_pingpong_threshold,
+                                       pool,
+                                       module_map,
+                                       dependency_map):
   """
   Checks if the given :param module_map: and :param dependency_map: (which is
   created bound to the :param module_map:) contain circular dependencies on
   the module "folder" level.
+
+  :param iteration_pingpong_buffer: A buffer to store dependency cycles in a
+  circular resolution detection lookbehind approximator. If the same cycle
+  appears twice in this buffer, the algorithm is considered to have stuck in
+  a loop.
 
   :param pool: A :type multiprocessing.Pool: on which the cycle resolution
   should be executed. Individual cycles can be resolved in an parallel manner,
@@ -367,31 +379,43 @@ def get_circular_dependency_resolution(pool, module_map, dependency_map):
             # so the order is deterministic.
             sorted(module_map.get_dependencies_of_module(module)))
 
+  logging.normal("... Searching for cycles between %d modules ..."
+                 % len(module_map))
   dependencies = dict(map(_map_to_dependencies, module_map))
-  graph = nx.DiGraph(dependencies)
-  cycles = list(nx.simple_cycles(graph))
+  shortest_cycle_length, minimum_long_cycles = graph.simple_cycles(
+      dependencies)
+  # minimum_long_cycles return a dict(Node, [Node, Node2, Node3, ..., Node])
+  # format, associating each module with an edge that contains the associated
+  # edge both as a prefix and a suffix. Cut this out to a simple
+  # [Node, Node2, ...] list instead.
+  cycles = list(map(lambda pair: pair[1][:-1], minimum_long_cycles))
   if not cycles:
     # If the dependency graph no longer contains any cycles, there is nothing
     # to resolve.
     return True
 
-  smallest_cycles_length = min([len(c) for c in cycles])
-  smallest_cycles = list(
-    filter(lambda l: len(l) == smallest_cycles_length, cycles))
-  # "simple_cycles" isn't deterministic on the "inner" order of the result -
+  # The found cycle list isn't deterministic on the "inner" order of the result
   # the order of nodes in the cycle. To make the results more reproducible
   # and debuggable, we sacrifice some CPU time here to keep a consistent order.
-  util.rotate_list_of_cycles(smallest_cycles)
+  util.rotate_list_of_cycles(cycles)
+
+  # The exact same cycle might be repeating at this point, and while it was
+  # previously hard to detect because it could have been A->B->C and B->C->A
+  # and C->A->B in the result, after rotation, now it's
+  # [A->B->C, A->B->C, A->B->C].
+  cycles = list(set([','.join(cycle) for cycle in cycles]))
 
   # Now create an alphanumeric order of the cycles which respects every
   # element, so the list is ordered based on sublists' 1st element, then
   # within each group the 2nd, etc.
-  smallest_cycles.sort(key=lambda l: ','.join(l))
+  cycles.sort()
+  iteration_pingpong_buffer.extend(cycles)
+  cycles = [cycle.split(',') for cycle in cycles]
 
   logging.normal("Found %d smallest cycles of length %d between modules."
-                 % (len(smallest_cycles), smallest_cycles_length))
+                 % (len(cycles), shortest_cycle_length))
 
-  args = zip(smallest_cycles,
+  args = zip(cycles,
              itertools.repeat(module_map),
              itertools.repeat(dependency_map))
 
@@ -401,13 +425,37 @@ def get_circular_dependency_resolution(pool, module_map, dependency_map):
       return False
     ret.update(result)
 
+  if iteration_pingpong_buffer:
+    iteration_pingpong_check = next(iter(Counter(iteration_pingpong_buffer)
+                                         .most_common(1)),
+                                    None)
+    if iteration_pingpong_check and \
+          iteration_pingpong_check[1] > iteration_pingpong_threshold:
+        # Found the same cycle twice in the lookbehind buffer - consider the
+        # algorithm looping...
+        logging.essential("Error! The same cycle appeared %d times amongst "
+                          "the last %d handled cycles.\nConsidering the "
+                          "algorithm to have stuck in a loop!\n%s"
+                          % (iteration_pingpong_check[1],
+                             len(iteration_pingpong_buffer),
+                             iteration_pingpong_check[0]), file=sys.stderr)
+        logging.essential("The offending file moves in the current step, "
+                          "likely continuing the cycle were: ")
+        for file, module in ret.items():
+          logging.essential("    %s -> %s" % (file, module))
+
+        raise RecursionError()
+
   return ret
 
 
-def main(MODULE_MAP, DEPENDENCY_MAP, THREAD_COUNT):
+def main(MODULE_MAP, DEPENDENCY_MAP,
+         THREAD_COUNT, MODULE_SPLIT_PINGPONG_THRESHOLD):
   # Make sure the module-to-module import directives are in the dependency map,
   # as this stage operates based on them.
   DEPENDENCY_MAP.synthesize_intermodule_imports()
+
+  pingpong_buffer = deque([], MODULE_SPLIT_PINGPONG_THRESHOLD ** 2)
 
   # Check if the read module map contains circular dependencies that make the
   # current module map infeasible, and try to resolve it.
@@ -423,6 +471,7 @@ def main(MODULE_MAP, DEPENDENCY_MAP, THREAD_COUNT):
         % iteration_count)
 
       files_to_move = get_circular_dependency_resolution(
+        pingpong_buffer, MODULE_SPLIT_PINGPONG_THRESHOLD,
         pool, MODULE_MAP, DEPENDENCY_MAP)
       if files_to_move is False:
         logging.essential("Error! The modules contain circular dependencies "

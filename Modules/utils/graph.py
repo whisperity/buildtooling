@@ -1,4 +1,5 @@
 from collections import deque
+import operator
 
 try:
   import networkx as nx
@@ -85,3 +86,55 @@ def transitive_leveled_successors(graph, node):
   The :param node: itself is not generated.
   """
   return __transitive_leveled_graph_iteration(graph.successors, node)
+
+
+def simple_cycles(directed_edges):
+  """
+  Generate shortest simple cycles using a quadratic algorithm.
+  Useful when :func:`nx.simple_cycles()` does not terminate in a reasonable
+  time.
+
+  :return: (minimum_length, cycles), where `cycles` is a
+  `dict(Node, [Nodes...])`, for each node listing one shortest path starting
+  from that node. The path is represented as a list of nodes, which always
+  contains the starting node as its prefix and suffix.
+  """
+  graph = nx.DiGraph(directed_edges)
+  sorted_edges = sorted(directed_edges)
+
+  # Generating the simple_cycles() of the dependency graph is very very costly
+  # at this point, as for ~60 modules they could be the order of or above
+  # 10 billion. Instead, this quadratic algorithm of the adjacency matrix will
+  # try selecting shortest cycles.
+  dependency_paths = dict()
+  for n in sorted_edges:
+    for m in sorted_edges:
+      if n == m:
+        continue
+
+      try:
+        forward_path = next(nx.shortest_simple_paths(graph, n, m))
+        backward_path = next(nx.shortest_simple_paths(graph, m, n))
+      except nx.NetworkXNoPath:
+        # Disregard the exception if a module cannot be reached from another
+        # one.
+        continue
+
+      # Cut the repeated middle element.
+      cycle = forward_path + backward_path[1:]
+      if n not in dependency_paths or len(cycle) < len(dependency_paths[n]):
+        dependency_paths[n] = cycle
+
+  if not dependency_paths:
+    # If there are no cycles, quit.
+    return 0, list()
+
+  cycle_lengths = sorted(
+    map(lambda e: (e[0], len(e[1])), dependency_paths.items()),
+    key=operator.itemgetter(1))
+  cycle_lengths_minimum = min(cycle_lengths, key=operator.itemgetter(1))[1]
+  minimum_long_cycles = sorted(filter(
+    lambda e: len(e[1]) == cycle_lengths_minimum,
+    dependency_paths.items()))
+
+  return cycle_lengths_minimum, minimum_long_cycles

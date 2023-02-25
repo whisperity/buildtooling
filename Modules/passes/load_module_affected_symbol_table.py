@@ -7,7 +7,7 @@ from utils.progress_bar import tqdm
 DESCRIPTION = "Load symbol table details from analysis output"
 
 
-def unpack_symbol_line(l):
+def unpack_symbol_line(line):
   """
   Unpacks data from a single line corresponding to one symbol emitted in the
   symbol table.
@@ -16,7 +16,7 @@ def unpack_symbol_line(l):
   """
   # Parse the output of the directive file. A line is formatted like:
   #     main.cpp##1:2##1:5##MyClass
-  file, begin_loc, end_loc, name = l.strip().split('##')
+  file, begin_loc, end_loc, name = line.strip().split('##')
   begin_loc_int = list(map(int, begin_loc.split(':')))
   end_loc_int = list(map(int, end_loc.split(':')))
   begin_row, begin_col = begin_loc_int[0], begin_loc_int[1]

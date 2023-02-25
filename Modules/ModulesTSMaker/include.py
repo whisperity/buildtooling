@@ -31,7 +31,7 @@ def get_included_files(text):
   """
   # QUESTION: Maybe a better approach is needed, like 'clang-scan-deps'?
   return list(map(directive_to_filename,
-                  filter(lambda l: l.startswith('#include '),
+                  filter(lambda line: line.startswith('#include '),
                          text.splitlines())))
 
 
@@ -96,8 +96,8 @@ def filter_imports_from_includes(filename,
         module = __get_module(included)
         if module:
           logging.verbose("%s: Include '%s' resolved as '%s'"
-                         % (filename, original_included, included),
-                         file=sys.stderr)
+                          % (filename, original_included, included),
+                          file=sys.stderr)
           break
 
       if not module:
