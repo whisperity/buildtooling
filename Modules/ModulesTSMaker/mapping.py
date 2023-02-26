@@ -716,7 +716,8 @@ def write_topological_order(module_file,
         lines_to_keep.append(l)
 
     if not includes_start_at:
-      logging.essential("Error! No inclusion directives found in module file."
+      logging.essential("Error! No inclusion directives found in module "
+                        "file '%s'."
                         % module_file,
                         file=sys.stderr)
       return False
