@@ -21,6 +21,15 @@ from passes import PassLoader
 
 # ------------------- Set up the command-line configuration -------------------
 
+# TODO: Macros can bleed out of the buffer if files are concatenated. While
+# TODO: this isn't a problem if a macro is defined only in a TU and redefined
+# TODO: in another TU (compiler will give a warning on this), subtle header
+# TODO: macro bleedouts MIGHT change behaviour of the program massively.
+#
+# TODO: It should be added to either ModuleMake or to SymbolAnaliser to find
+# TODO: these macros and report an error if their meanings would change down
+# TODO: the line, or rename them...
+
 PARSER = argparse.ArgumentParser(
   prog='automodules',
   formatter_class=argparse.ArgumentDefaultsHelpFormatter,
